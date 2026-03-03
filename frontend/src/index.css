@@ -236,6 +236,18 @@ button.dot {
 .warn {
   color: #b8860b;
 }
+.status-indexing {
+  color: #1d5a8a;
+  font-weight: 600;
+}
+.status-empty {
+  color: #b8860b;
+  font-weight: 600;
+}
+.status-ok {
+  color: #2f8a42;
+  font-weight: 600;
+}
 
 .feature-row {
   margin: 16px 0;

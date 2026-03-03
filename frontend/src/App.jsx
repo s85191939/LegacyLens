@@ -134,7 +134,7 @@ function App() {
   const [showDonutWindow, setShowDonutWindow] = useState(false)
   const [openDropdown, setOpenDropdown] = useState(null) // 'general' | 'explain' | ... | null
   const [windowPosition, setWindowPosition] = useState({ x: 96, y: 52 })
-  const [indexEmpty, setIndexEmpty] = useState(false)
+  const [indexEmpty, setIndexEmpty] = useState(true) // assume empty until health or first query proves otherwise
   const [ingesting, setIngesting] = useState(false)
   const [ingestStartTime, setIngestStartTime] = useState(null)
   const [ingestElapsed, setIngestElapsed] = useState(0)
@@ -173,8 +173,21 @@ function App() {
   useEffect(() => {
     fetch(`${API_BASE}/health`)
       .then((res) => res.json())
-      .then((data) => setHealth(data))
-      .catch((err) => setHealth({ status: 'error', error: err.message }))
+      .then((data) => {
+        setHealth(data)
+        const col = data?.collection
+        const points = col?.points_count ?? col?.vectors_count
+        const hasError = col?.error != null
+        if (hasError || points == null || (typeof points === 'number' && points === 0)) {
+          setIndexEmpty(true)
+        } else if (typeof points === 'number' && points > 0) {
+          setIndexEmpty(false)
+        }
+      })
+      .catch((err) => {
+        setHealth({ status: 'error', error: err.message })
+        setIndexEmpty(true)
+      })
   }, [])
 
   useEffect(() => {
@@ -225,6 +238,7 @@ function App() {
             if (data.type === 'sources') {
               setSources(data.sources || [])
               setIndexEmpty(!!data.index_empty)
+              if ((data.sources || []).length > 0) setIndexEmpty(false)
               setTimings((prev) => ({ ...prev, retrieval_ms: Math.round(data.retrieval_time_ms || 0) }))
             } else if (data.type === 'answer_chunk') {
               answerText += data.content
@@ -250,6 +264,7 @@ function App() {
         }
         setAnswer(data.answer || '')
         setSources(data.sources || [])
+        if (data.sources?.length > 0) setIndexEmpty(false)
         if (data.sources?.length === 0 && data.answer?.includes('No code indexed')) setIndexEmpty(true)
         setTimings({
           retrieval_ms: Math.round(data.retrieval_time_ms || 0),
@@ -281,6 +296,7 @@ function App() {
       }
       setAnswer(`[SYSTEM] Ingestion ${data.status}: ${data.message}`)
       setSources([])
+      setIndexEmpty(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -294,6 +310,9 @@ function App() {
     setShowTerminal(true)
     setIsMinimized(false)
   }
+
+  // Two states: (1) Indexed & searchable — query UI enabled. (2) Not searchable — reindexing (beach ball + disabled) or index empty (REINDEX only, disabled).
+  const searchable = !ingesting && !indexEmpty
 
   const endWindowDrag = () => {
     dragRef.current = null
@@ -422,6 +441,9 @@ function App() {
                 <span className={health?.status === 'healthy' ? 'ok' : 'warn'}>
                   {health?.status ? health.status.toUpperCase() : 'CHECKING'}
                 </span>
+                {ingesting && <span className="status-indexing"> | INDEXING</span>}
+                {!searchable && !ingesting && indexEmpty && <span className="status-empty"> | REINDEX REQUIRED</span>}
+                {searchable && <span className="status-ok"> | SEARCHABLE</span>}
                 {timings?.retrieval_ms ? ` | RETRIEVAL ${timings.retrieval_ms}ms` : ''}
                 {timings?.total_ms ? ` | TOTAL ${timings.total_ms}ms` : ''}
                 {sources.length ? ` | SOURCES ${sources.length}` : ''}
@@ -438,7 +460,7 @@ function App() {
                 </div>
               )}
 
-              <div className={`feature-row ${ingesting ? 'disabled' : ''}`} aria-disabled={ingesting}>
+              <div className={`feature-row ${searchable ? '' : 'disabled'}`} aria-disabled={!searchable}>
                 <span className="feature-row-label">Query mode:</span>
                 {FEATURES_WITH_PROMPTS.map((f) => {
                   const key = f.id ?? 'general'
@@ -471,7 +493,7 @@ function App() {
                                 role="option"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (ingesting) return
+                                  if (!searchable) return
                                   setFeature(f.id)
                                   setQuery(p)
                                   handleQuery(p)
@@ -489,7 +511,7 @@ function App() {
                 })}
               </div>
 
-              <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} disabled={ingesting} />
+              <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} disabled={!searchable} />
 
               {error && <div className="error-box">[ERROR] {error}</div>}
 
