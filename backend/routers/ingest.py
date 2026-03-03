@@ -35,6 +35,7 @@ async def _run_ingestion(pipeline, codebase_path, reingest):
         _ingestion_status["last_stats"] = {
             "files_scanned": stats.files_scanned,
             "files_processed": stats.files_processed,
+            "total_lines": stats.total_lines,
             "total_chunks": stats.total_chunks,
             "total_tokens": stats.total_tokens,
             "total_embeddings": stats.total_embeddings,

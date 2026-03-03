@@ -90,6 +90,39 @@ This keeps the same core architecture runnable across laptop dev, hackathon demo
 - **Docker**: portable runtime packaging
 - **Qdrant**: vector indexing and retrieval
 
+### What is Tiktoken?
+
+**Tiktoken** is OpenAI’s tokenizer library. We use it in the ingestion pipeline to **count tokens** in text so chunk sizes stay within model limits.
+
+- **Why it matters:** Embedding and LLM APIs charge and limit by tokens, not characters. Chunks must fit the embedding model’s context; we also cap context sent to the LLM. Guessing by character count is unreliable (e.g. code and symbols tokenize differently).
+- **How we use it:** In `backend/ingestion/chunker.py` we use the **`cl100k_base`** encoding (same as GPT-4 and `text-embedding-3-small`). We call `count_tokens(text)` to:
+  - Enforce max chunk size in the **fallback** chunker (when we’re not splitting by COBOL paragraph or C function).
+  - Record `tokens` per chunk in metadata for cost/debugging.
+- **Without tiktoken:** We’d have to approximate with character/word counts or another tokenizer, risking overflow or inconsistent behavior across OpenAI models.
+
+So tiktoken is the **token-counting** dependency that keeps chunking and context windows aligned with the models we call.
+
+### What if we add LangChain and OpenRouter?
+
+- **OpenRouter** is **already** in the project: it’s used as a **fallback** when the primary OpenAI call fails (see `backend/rag/generator.py` and `backend/config.py`). You can set `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, and `OPENROUTER_MODEL` to use OpenRouter-backed models. No code change required to “add” OpenRouter for fallback.
+
+- **Adding LangChain** would be an architectural choice with tradeoffs:
+
+  **Potential benefits:**
+
+  - **Pre-built components:** Document loaders, text splitters, vector-store integrations (including Qdrant), and chain patterns could replace some custom code.
+  - **Ecosystem:** Easier to plug in LangSmith, other retrievers, or agent patterns later.
+  - **Less custom glue:** Retriever → context formatting → LLM could be expressed as a chain.
+
+  **Tradeoffs:**
+
+  - **Fit to code:** Our chunking is **syntax-aware** (COBOL divisions/paragraphs, C functions). LangChain’s splitters are mostly generic (by character/ token or markdown). We’d either keep a custom splitter and feed LangChain “documents” we built, or lose the current code-aware boundaries.
+  - **Citations:** We need **file path + start/end line** on every chunk and in the final answer. LangChain’s default document format and citation flow would need to be extended or wrapped to preserve that.
+  - **Dependencies and complexity:** Adding `langchain`, `langchain-openai`, `langchain-qdrant`, etc. increases surface area and upgrade churn. Our current pipeline is a few focused modules with no chain abstraction.
+  - **Control:** We explicitly control prompt shape, context assembly, and streaming. LangChain would add a layer between our FastAPI routes and the LLM/embedding calls.
+
+  **Summary:** OpenRouter is already supported as a fallback. Adding LangChain is optional: it could simplify some orchestration and make future integrations easier, but we’d likely keep **custom chunking** (and possibly custom retrieval) to preserve code structure and citations. A hybrid—e.g. LangChain for retrieval + generation, our code for scanning/chunking and metadata—is possible if we want to try the framework without giving up the current code-centric behavior.
+
 ## API Endpoints
 
 - `GET /api/health` - service + vector DB status
@@ -137,3 +170,46 @@ The current architecture reflects a practical tradeoff: fast iteration speed now
 - Runs locally and on public cloud endpoint
 
 Remaining work is scale/reliability polish, not missing core MVP capability.
+
+### MVP discussion
+
+**Things to add:** I searched the repo for LangChain, LangGraph, and LangSmith and found no usage.
+
+**2. What if we add LangChain and OpenRouter?**
+
+**OpenRouter:** Already in the project as a fallback when OpenAI fails (`generator.py`, config). You can set `OPENROUTER_API_KEY` (and related env vars) to use it; no extra “add OpenRouter” step needed.
+
+**Adding LangChain:** Described as an optional architectural choice:
+
+- **Upsides:** Ready-made loaders, splitters, Qdrant integration, chains; easier to add LangSmith or other integrations later.
+- **Downsides:** Our chunking is syntax-aware (COBOL/C); LangChain splitters are generic—we’d keep custom chunking or lose that. We need file + line citations; LangChain’s defaults would need to be extended. More dependencies and less direct control over prompts and streaming.
+- **Summary:** OpenRouter is already supported. LangChain could be added for orchestration, but we’d likely keep custom chunking (and maybe retrieval) for code structure and citations; a hybrid (LangChain for retriever/LLM, our code for scan/chunk/metadata) is possible.
+
+## Explicit Performance Evaluation (Target Gates)
+
+LegacyLens now includes a dedicated evaluator for the Week 3 performance targets:
+
+- Query latency: `<3s` end-to-end (p95)
+- Retrieval precision: `>70%` relevant chunks in top-5
+- Codebase coverage: `100%` files indexed
+- Ingestion throughput: `10,000+ LOC` in `<5 min`
+- Answer accuracy: valid cited file/line references
+
+Run locally against a running instance:
+
+```bash
+python3 evals/run_performance_eval.py --api-base http://localhost:8000
+```
+
+Run with a fresh full reindex before scoring:
+
+```bash
+python3 evals/run_performance_eval.py --api-base http://localhost:8000 --reingest
+```
+
+Artifacts:
+
+- Query set: `evals/performance_queries.json`
+- Output report: `evals/performance_report.json`
+
+The evaluator exits with non-zero status if any gate fails.

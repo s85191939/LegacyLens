@@ -1,0 +1,22 @@
+[
+  {
+    "query": "Where is the main entry point of the compiler?",
+    "expected_hints": ["main", "driver", "compile", "parser", "cobc"]
+  },
+  {
+    "query": "Show parser implementation flow.",
+    "expected_hints": ["parse", "parser", "grammar", "syntax"]
+  },
+  {
+    "query": "How does error handling work in gnucobol?",
+    "expected_hints": ["error", "diagnostic", "warning", "report"]
+  },
+  {
+    "query": "Find all file I/O operations.",
+    "expected_hints": ["read", "write", "open", "close", "file"]
+  },
+  {
+    "query": "What are the dependencies of MODULE-X?",
+    "expected_hints": ["call", "perform", "copy", "depend"]
+  }
+]

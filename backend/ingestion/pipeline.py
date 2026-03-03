@@ -20,6 +20,7 @@ class IngestionStats:
     """Statistics from an ingestion run."""
     files_scanned: int = 0
     files_processed: int = 0
+    total_lines: int = 0
     total_chunks: int = 0
     total_tokens: int = 0
     total_embeddings: int = 0
@@ -70,6 +71,7 @@ class IngestionPipeline:
         logger.info(f"Scanning codebase: {codebase_path}")
         scan_result = scan_codebase(codebase_path)
         stats.files_scanned = scan_result.total_files
+        stats.total_lines = scan_result.total_lines
         logger.info(
             f"Found {scan_result.total_files} files, "
             f"{scan_result.total_lines} lines across "
