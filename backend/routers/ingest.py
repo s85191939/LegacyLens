@@ -1,6 +1,6 @@
 """Ingestion endpoint - triggers codebase ingestion pipeline."""
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
@@ -20,42 +20,28 @@ class IngestResponse(BaseModel):
     stats: dict = {}
 
 
-# Track ingestion state
+# Track ingestion state (for /api/ingest/status)
 _ingestion_status = {"running": False, "last_stats": None}
 
 
-async def _run_ingestion(pipeline, codebase_path, reingest):
-    """Run ingestion in background."""
-    _ingestion_status["running"] = True
-    try:
-        stats = await pipeline.ingest(
-            codebase_path=codebase_path,
-            reingest=reingest,
-        )
-        _ingestion_status["last_stats"] = {
-            "files_scanned": stats.files_scanned,
-            "files_processed": stats.files_processed,
-            "total_lines": stats.total_lines,
-            "total_chunks": stats.total_chunks,
-            "total_tokens": stats.total_tokens,
-            "total_embeddings": stats.total_embeddings,
-            "languages": stats.languages,
-            "duration_seconds": round(stats.duration_seconds, 2),
-            "errors": stats.errors[:10],  # Limit error list
-        }
-    except Exception as e:
-        _ingestion_status["last_stats"] = {"error": str(e)}
-    finally:
-        _ingestion_status["running"] = False
+def _stats_dict(stats):
+    """Build stats dict from pipeline result or error."""
+    return {
+        "files_scanned": stats.files_scanned,
+        "files_processed": stats.files_processed,
+        "total_lines": stats.total_lines,
+        "total_chunks": stats.total_chunks,
+        "total_tokens": stats.total_tokens,
+        "total_embeddings": stats.total_embeddings,
+        "languages": stats.languages,
+        "duration_seconds": round(stats.duration_seconds, 2),
+        "errors": (stats.errors or [])[:10],
+    }
 
 
 @router.post("/api/ingest", response_model=IngestResponse)
-async def ingest_codebase(
-    request: Request,
-    body: IngestRequest,
-    background_tasks: BackgroundTasks,
-):
-    """Trigger ingestion of the codebase."""
+async def ingest_codebase(request: Request, body: IngestRequest):
+    """Trigger ingestion of the codebase. Blocks until indexing is complete so the UI can disable queries for the full duration."""
     if not getattr(request.app.state, "qdrant_connected", False):
         raise HTTPException(
             status_code=503,
@@ -69,18 +55,23 @@ async def ingest_codebase(
         )
 
     pipeline = request.app.state.pipeline
-
-    background_tasks.add_task(
-        _run_ingestion,
-        pipeline,
-        body.codebase_path,
-        body.reingest,
-    )
-
-    return IngestResponse(
-        status="started",
-        message="Ingestion started in background. Check /api/ingest/status for progress.",
-    )
+    _ingestion_status["running"] = True
+    try:
+        stats = await pipeline.ingest(
+            codebase_path=body.codebase_path,
+            reingest=body.reingest,
+        )
+        _ingestion_status["last_stats"] = _stats_dict(stats)
+        return IngestResponse(
+            status="completed",
+            message=f"Ingested {stats.total_chunks} chunks from {stats.files_processed} files.",
+            stats=_ingestion_status["last_stats"],
+        )
+    except Exception as e:
+        _ingestion_status["last_stats"] = {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        _ingestion_status["running"] = False
 
 
 @router.get("/api/ingest/status")

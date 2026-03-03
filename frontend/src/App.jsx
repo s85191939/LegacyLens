@@ -427,8 +427,8 @@ function App() {
               />
             </div>
             <div className="window-title">LegacyLens :: Terminal</div>
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={handleIngest} disabled={loading} className="mini-btn">
-              {loading ? 'BUSY' : 'REINDEX'}
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={handleIngest} disabled={loading || ingesting} className="mini-btn">
+              {ingesting ? 'REINDEXING' : loading ? 'BUSY' : 'REINDEX'}
             </button>
           </div>
 
@@ -441,24 +441,18 @@ function App() {
                 <span className={health?.status === 'healthy' ? 'ok' : 'warn'}>
                   {health?.status ? health.status.toUpperCase() : 'CHECKING'}
                 </span>
-                {ingesting && <span className="status-indexing"> | INDEXING</span>}
+                {ingesting && (
+                  <span className="status-indexing">
+                    {' '}
+                    | INDEXING ({Math.floor(ingestElapsed / 60)}:{String(ingestElapsed % 60).padStart(2, '0')})
+                  </span>
+                )}
                 {!searchable && !ingesting && indexEmpty && <span className="status-empty"> | REINDEX REQUIRED</span>}
                 {searchable && <span className="status-ok"> | SEARCHABLE</span>}
                 {timings?.retrieval_ms ? ` | RETRIEVAL ${timings.retrieval_ms}ms` : ''}
                 {timings?.total_ms ? ` | TOTAL ${timings.total_ms}ms` : ''}
                 {sources.length ? ` | SOURCES ${sources.length}` : ''}
               </p>
-
-              {ingesting && (
-                <div className="ingest-overlay">
-                  <div className="spinning-ball" aria-hidden="true" />
-                  <p className="ingest-overlay-text">Indexing codebase…</p>
-                  <p className="ingest-overlay-timer">
-                    {Math.floor(ingestElapsed / 60)}:{String(ingestElapsed % 60).padStart(2, '0')}
-                  </p>
-                  <p className="ingest-overlay-hint">Queries disabled until indexing finishes.</p>
-                </div>
-              )}
 
               <div className={`feature-row ${searchable ? '' : 'disabled'}`} aria-disabled={!searchable}>
                 <span className="feature-row-label">Query mode:</span>
@@ -520,8 +514,8 @@ function App() {
                   <p className="reindex-cta-text">
                     {answer?.includes('Something went wrong') ? 'Something went wrong. Run REINDEX to refresh the index, or try rephrasing your query.' : 'No code indexed yet. Click REINDEX in the title bar above to ingest the codebase, then try your query again.'}
                   </p>
-                  <button type="button" className="reindex-cta-btn" onClick={handleIngest} disabled={loading}>
-                    {loading ? 'Indexing…' : 'Run REINDEX'}
+                  <button type="button" className="reindex-cta-btn" onClick={handleIngest} disabled={loading || ingesting}>
+                    {ingesting ? 'REINDEXING…' : loading ? 'BUSY' : 'Run REINDEX'}
                   </button>
                 </div>
               )}
