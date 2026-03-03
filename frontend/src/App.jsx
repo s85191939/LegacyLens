@@ -5,13 +5,108 @@ import ResultsPanel from './components/ResultsPanel'
 
 const API_BASE = '/api'
 
-const FEATURES = [
-  { id: null, label: 'GENERAL', hint: 'General search' },
-  { id: 'explain', label: 'EXPLAIN', hint: 'Code explanation' },
-  { id: 'dependencies', label: 'DEPENDENCIES', hint: 'Dependency mapping' },
-  { id: 'patterns', label: 'PATTERNS', hint: 'Pattern detection' },
-  { id: 'documentation', label: 'DOCS', hint: 'Documentation' },
-  { id: 'business_logic', label: 'BUSINESS', hint: 'Business logic' },
+const FEATURES_WITH_PROMPTS = [
+  {
+    id: null,
+    label: 'GENERAL',
+    prompts: [
+      'Where is the main entry point of the compiler?',
+      'How does COBOL file I/O work?',
+      'What error handling patterns are used?',
+      'Show me the parser implementation.',
+      'How are COBOL divisions and sections parsed?',
+      'Where is symbol table or name resolution handled?',
+      'How does the code generator emit output?',
+      'What data structures represent the AST or parse tree?',
+      'How are COPY and REPLACING directives processed?',
+      'Where is numeric or decimal arithmetic implemented?',
+      'Find the main program or driver routine.',
+      'How is memory management done?',
+      'Where are compiler flags or options parsed?',
+      'Show error message formatting or reporting.',
+      'How is the symbol table built?',
+    ],
+  },
+  {
+    id: 'explain',
+    label: 'EXPLAIN',
+    prompts: [
+      'Explain what the main compilation loop does.',
+      'Explain how COBOL paragraphs are compiled.',
+      'Explain the role of the lexer and parser.',
+      'Explain how data division is processed.',
+      'Explain code generation for PERFORM.',
+      'Explain how CALL statements are handled.',
+      'Explain the preprocessor or COPY handling.',
+      'Explain error recovery in the parser.',
+      'Explain how literals and constants are stored.',
+      'Explain the runtime library interface.',
+    ],
+  },
+  {
+    id: 'dependencies',
+    label: 'DEPENDENCIES',
+    prompts: [
+      'What calls the main entry point?',
+      'What does the parser depend on?',
+      'Show PERFORM/CALL/COPY dependencies for the compiler.',
+      'What modules does code generation depend on?',
+      'Map dependencies of the symbol table.',
+      'What are the dependencies of the scanner?',
+      'Show call graph for error handling.',
+      'What does the optimizer depend on?',
+      'Dependencies of the code emitter.',
+      'What external libraries does the compiler use?',
+    ],
+  },
+  {
+    id: 'patterns',
+    label: 'PATTERNS',
+    prompts: [
+      'Find all file I/O operations.',
+      'Find error handling patterns in this codebase.',
+      'Show similar code patterns for PERFORM.',
+      'Find all places that modify the symbol table.',
+      'Patterns for parsing identifiers.',
+      'Find recursive or nested parsing patterns.',
+      'Show patterns for emitting machine code.',
+      'Find all COPY or INCLUDE usage.',
+      'Patterns for type checking or validation.',
+      'Find similar error message formatting.',
+    ],
+  },
+  {
+    id: 'documentation',
+    label: 'DOCS',
+    prompts: [
+      'Generate a short doc for the main compilation flow.',
+      'Document the chunking or parsing pipeline.',
+      'Summarize the public API of the code generator.',
+      'Document how to add a new COBOL construct.',
+      'Document the embedding or vector storage usage.',
+      'Document error codes and meanings.',
+      'Document the symbol table structure.',
+      'Document the AST node types.',
+      'Document configuration or build options.',
+      'Document the runtime interface.',
+    ],
+  },
+  {
+    id: 'business_logic',
+    label: 'BUSINESS',
+    prompts: [
+      'What business rules does the compiler enforce?',
+      'Where are language semantics enforced?',
+      'What validation happens during compilation?',
+      'Where are COBOL standards checked?',
+      'What decisions affect code generation?',
+      'Where are compiler limits or quotas applied?',
+      'What runtime behavior is guaranteed?',
+      'Where are dialect or extension rules?',
+      'What optimization decisions are made?',
+      'Where is diagnostic or reporting policy?',
+    ],
+  },
 ]
 
 function formatMenuTime(date) {
@@ -239,22 +334,30 @@ function App() {
 
               <div className="feature-row">
                 <span className="feature-row-label">Query mode:</span>
-                {FEATURES.map((f) => (
-                  <button
+                {FEATURES_WITH_PROMPTS.map((f) => (
+                  <select
                     key={f.id ?? 'general'}
-                    type="button"
-                    onClick={() => setFeature(f.id)}
-                    className={`feature-chip ${feature === f.id ? 'active' : ''}`}
-                    title={f.hint}
+                    className={`feature-dropdown ${feature === f.id ? 'active' : ''}`}
+                    value=""
+                    onChange={(e) => {
+                      const prompt = e.target.value
+                      if (!prompt) return
+                      setFeature(f.id)
+                      setQuery(prompt)
+                      handleQuery(prompt)
+                      e.target.value = ''
+                    }}
+                    title={`Choose a ${f.label} prompt`}
+                    aria-label={`${f.label} prompts`}
                   >
-                    {f.label}
-                  </button>
+                    <option value="">{f.label}</option>
+                    {f.prompts.map((p) => (
+                      <option key={p} value={p}>
+                        {p.length > 45 ? p.slice(0, 42) + '…' : p}
+                      </option>
+                    ))}
+                  </select>
                 ))}
-                {feature != null && (
-                  <span className="feature-hint">
-                    ({FEATURES.find((x) => x.id === feature)?.hint ?? 'General'})
-                  </span>
-                )}
               </div>
 
               <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} />

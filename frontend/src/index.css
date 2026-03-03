@@ -255,6 +255,31 @@ button.dot {
   background: var(--accent-soft);
 }
 
+.feature-dropdown {
+  border: 1px solid #b5c9dc;
+  background: #eef5fb;
+  color: var(--ink-muted);
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 100px;
+  max-width: 200px;
+  font-family: inherit;
+}
+
+.feature-dropdown:hover,
+.feature-dropdown:focus {
+  border-color: #7ab3e8;
+  outline: none;
+}
+
+.feature-dropdown.active {
+  color: #175188;
+  border-color: #7ab3e8;
+  background: var(--accent-soft);
+}
+
 .prompt-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
