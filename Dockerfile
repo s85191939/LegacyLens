@@ -28,7 +28,7 @@ COPY start_server.py ./
 COPY --from=frontend-build /app/dist static/
 
 # Clone the GnuCOBOL codebase for ingestion
-RUN git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol || \
+RUN git clone --depth 1 https://github.com/s85191939/gnucobol.git codebase/gnucobol || \
     mkdir -p codebase/gnucobol
 
 EXPOSE 8000

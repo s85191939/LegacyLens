@@ -216,7 +216,7 @@ So tiktoken is the **token-counting** dependency that keeps chunking and context
 ```bash
 git clone https://github.com/s85191939/LegacyLens.git
 cd LegacyLens
-git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol
+git clone --depth 1 https://github.com/s85191939/gnucobol.git codebase/gnucobol
 cp .env.example .env
 # set OPENAI_API_KEY in .env
 ./start.sh
