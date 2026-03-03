@@ -60,12 +60,12 @@ cd /path/to/LegacyLens
 ./start.sh
 ```
 
-The script automatically navigates to the repo directory, checks for `.env` and the codebase, and starts Docker Compose.
+The script checks for `.env` and the codebase, then starts Docker Compose.
 
-**Option B — Run manually** (make sure you're in the directory containing `docker-compose.yml`):
+**Option B — Run manually:**
 
 ```bash
-cd /path/to/LegacyLens/repo
+cd /path/to/LegacyLens
 docker-compose up --build
 ```
 

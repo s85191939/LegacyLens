@@ -34,3 +34,6 @@ Thumbs.db
 
 # Qdrant data
 qdrant_data/
+
+# Docs (PDFs tracked separately)
+docs/*.pdf
