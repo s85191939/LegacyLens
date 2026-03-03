@@ -169,15 +169,25 @@ The current architecture reflects a practical tradeoff: fast iteration speed now
 - Exposes web UI + API surface
 - Runs locally and on public cloud endpoint
 
+### MVP checklist
+
+- [x] Ingest at least one legacy codebase (GnuCOBOL)
+- [x] Syntax-aware chunking (COBOL paragraph/section, C function, fallback)
+- [x] Embeddings + vector store (OpenAI embeddings, Qdrant)
+- [x] Semantic search with metadata (file path, line range, chunk type)
+- [x] Web UI with query input and results
+- [x] File + line references in answers (citations)
+- [x] Answer generation from retrieved context (RAG)
+- [x] Deployed on Railway (single port, health check)
+- [ ] LangChain / LangGraph / LangSmith (not used; optional per MVP discussion)
+
 Remaining work is scale/reliability polish, not missing core MVP capability.
 
 ### MVP discussion
 
-**Things to add:** I searched the repo for LangChain, LangGraph, and LangSmith and found no usage.
+**What if we add LangChain? (OpenRouter is already in the project.)**
 
-**2. What if we add LangChain and OpenRouter?**
-
-**OpenRouter:** Already in the project as a fallback when OpenAI fails (`generator.py`, config). You can set `OPENROUTER_API_KEY` (and related env vars) to use it; no extra “add OpenRouter” step needed.
+**OpenRouter:** Already wired as a fallback when OpenAI fails (`generator.py`, config). Set `OPENROUTER_API_KEY` and related env vars to use it—no extra setup.
 
 **Adding LangChain:** Described as an optional architectural choice:
 
