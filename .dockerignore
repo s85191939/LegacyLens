@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+*.egg-info/
+
+# Node
+frontend/node_modules/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+*.pdf
+LICENSE
+
+# Qdrant data
+qdrant_data/
+
+# Claude
+.claude/
