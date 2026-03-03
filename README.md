@@ -31,28 +31,53 @@ LegacyLens makes the **GnuCOBOL** compiler codebase (~128K LOC, 432 files) query
 ```bash
 git clone https://github.com/s85191939/LegacyLens.git
 cd LegacyLens
-
-# Clone the target codebase
-git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol
-
-# Create environment file
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
 ```
 
-### 2. Run with Docker Compose
+### 2. Clone the Target Codebase
 
 ```bash
+git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol
+```
+
+### 3. Create Environment File
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and add your OpenAI API key:
+
+```
+OPENAI_API_KEY=sk-your-openai-api-key-here
+```
+
+### 4. Run with Docker Compose
+
+**Option A — Use the startup script** (recommended, from the main LegacyLens folder):
+
+```bash
+cd /path/to/LegacyLens
+./start.sh
+```
+
+The script automatically navigates to the repo directory, checks for `.env` and the codebase, and starts Docker Compose.
+
+**Option B — Run manually** (make sure you're in the directory containing `docker-compose.yml`):
+
+```bash
+cd /path/to/LegacyLens/repo
 docker-compose up --build
 ```
 
-Services:
+This starts three services:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **API Docs (Swagger)**: http://localhost:8000/docs
 - **Qdrant Dashboard**: http://localhost:6333/dashboard
 
-### 3. Ingest the Codebase
+### 5. Ingest the Codebase
+
+Once all services are running, trigger ingestion of the GnuCOBOL codebase:
 
 ```bash
 curl -X POST http://localhost:8000/api/ingest \
@@ -60,13 +85,21 @@ curl -X POST http://localhost:8000/api/ingest \
   -d '{"reingest": true}'
 ```
 
-### 4. Query
+Check ingestion progress:
+
+```bash
+curl http://localhost:8000/api/ingest/status
+```
+
+### 6. Query the Codebase
 
 ```bash
 curl -X POST http://localhost:8000/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Where is the main entry point of the compiler?"}'
 ```
+
+Or open http://localhost:3000 in your browser and use the web interface.
 
 ## Local Development
 
