@@ -432,6 +432,43 @@ button.dot {
   font-size: 13px;
 }
 
+.reindex-cta {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #e8f4fc, #d6ebf9);
+  border: 1px solid #7ab3e8;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.reindex-cta-text {
+  margin: 0 0 10px;
+  color: #1a5276;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.reindex-cta-btn {
+  padding: 8px 16px;
+  background: #1f5f92;
+  color: #fff;
+  border: 1px solid #175078;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.reindex-cta-btn:hover:not(:disabled) {
+  background: #175078;
+}
+
+.reindex-cta-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .panels-grid {
   margin-top: 16px;
   display: grid;

@@ -66,6 +66,30 @@ class Retriever:
             file_path=file_path,
         )
 
+        # 2b. If no results and no filters, retry with larger k so we rarely return 0 when index has data
+        if not results and not language and not file_path:
+            results = await self.store.search(
+                query_embedding=query_embedding,
+                top_k=min(20, max(self.top_k_expanded, 10)),
+                language=None,
+                file_path=None,
+            )
+            if results:
+                results = results[: self.top_k]
+                logger.info("Initial search returned 0; used fallback broader search")
+
+        # 2c. Last resort: if index has data but we still have 0 (e.g. edge case), get any chunks so we always return something
+        if not results and not language and not file_path:
+            try:
+                info = await self.store.get_collection_info()
+                points = info.get("points_count") or info.get("vectors_count")
+                if isinstance(points, (int, float)) and points > 0:
+                    results = await self.store.get_any_chunks(limit=self.top_k)
+                    if results:
+                        logger.info("Using get_any_chunks fallback so user always gets an answer")
+            except Exception as exc:
+                logger.warning("get_any_chunks fallback failed: %s", exc)
+
         # 3. Check if results are ambiguous (low scores) → expand search
         if results and results[0].score < 0.5 and k == self.top_k:
             logger.info(

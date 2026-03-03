@@ -189,6 +189,42 @@ class QdrantStore:
 
         return search_results
 
+    async def get_any_chunks(self, limit: int = 5) -> List[SearchResult]:
+        """Return up to `limit` chunks from the collection (for fallback when semantic search returns 0)."""
+        client = self._build_client()
+        try:
+            # Scroll returns points in order; we only need a few
+            records, _ = await client.scroll(
+                collection_name=self.collection_name,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+        except Exception as exc:
+            logger.warning("Scroll fallback failed: %s", exc)
+            return []
+
+        results: List[SearchResult] = []
+        for rec in records:
+            payload = rec.payload or {}
+            results.append(
+                SearchResult(
+                    content=payload.get("content", ""),
+                    file_path=payload.get("file_path", ""),
+                    start_line=payload.get("start_line", 0),
+                    end_line=payload.get("end_line", 0),
+                    chunk_type=payload.get("chunk_type", ""),
+                    name=payload.get("name", ""),
+                    division=payload.get("division", ""),
+                    section=payload.get("section", ""),
+                    language=payload.get("language", ""),
+                    dependencies=payload.get("dependencies", []),
+                    score=0.0,  # fallback, no similarity score
+                    tokens=payload.get("tokens", 0),
+                )
+            )
+        return results
+
     async def get_collection_info(self) -> Dict[str, Any]:
         """Get collection statistics."""
         try:

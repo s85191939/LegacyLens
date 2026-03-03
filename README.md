@@ -66,6 +66,84 @@ sequenceDiagram
     UI-->>User: answer + cited files/lines
 ```
 
+## RAG Pipeline — Custom Build (No LangChain)
+
+LegacyLens uses a hand-built RAG pipeline instead of LangChain. Every stage is a focused Python module with direct API calls, no framework abstraction layer. This gives full control over syntax-aware chunking, citation metadata, and provider fallback — things that would require heavy customization inside LangChain anyway.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          INGESTION  (POST /api/ingest)                      │
+│                                                                             │
+│  ┌───────────┐    ┌──────────────┐    ┌──────────────────┐    ┌──────────┐ │
+│  │  SCANNER   │───▶│ PREPROCESSOR │───▶│     CHUNKER      │───▶│ EMBEDDER │ │
+│  │            │    │              │    │                  │    │          │ │
+│  │ Recursively│    │ Encoding     │    │ Language-aware:  │    │ OpenAI   │ │
+│  │ discover   │    │ detection    │    │                  │    │ text-    │ │
+│  │ .cob .cbl  │    │ (utf-8 →     │    │ COBOL: Division/ │    │ embedding│ │
+│  │ .c .h .conf│    │  latin-1 →   │    │  Section/        │    │ -3-small │ │
+│  │            │    │  cp1252)     │    │  Paragraph split │    │ 1536-dim │ │
+│  │ Count lines│    │              │    │                  │    │          │ │
+│  │ Detect lang│    │ COBOL fixed- │    │ C: Function-     │    │ Batch:   │ │
+│  │            │    │ format col   │    │  level brace     │    │ 100/call │ │
+│  │            │    │ 8-72 extract │    │  tracking        │    │ Retry: 3 │ │
+│  │            │    │              │    │                  │    │ (exp     │ │
+│  │            │    │ CRLF → LF    │    │ Fallback: token- │    │ backoff) │ │
+│  │            │    │              │    │  based 800 tok,  │    │          │ │
+│  │            │    │              │    │  150 tok overlap  │    │          │ │
+│  │            │    │              │    │  (tiktoken        │    │          │ │
+│  │            │    │              │    │   cl100k_base)    │    │          │ │
+│  └───────────┘    └──────────────┘    └──────────────────┘    └────┬─────┘ │
+│                                                                    │       │
+│                                          ┌─────────────────────────▼─────┐ │
+│                                          │        QDRANT VECTOR DB       │ │
+│                                          │                               │ │
+│                                          │  Collection: "legacylens"     │ │
+│                                          │  Distance:   COSINE           │ │
+│                                          │  Indexes:    file_path,       │ │
+│                                          │              language,         │ │
+│                                          │              chunk_type,       │ │
+│                                          │              division, section │ │
+│                                          │  Batch upsert: 100 points     │ │
+│                                          └───────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           QUERY  (POST /api/query)                          │
+│                                                                             │
+│  ┌──────────┐    ┌───────────────┐    ┌──────────────────┐    ┌──────────┐ │
+│  │  USER     │───▶│  RETRIEVER    │───▶│ CONTEXT ASSEMBLY │───▶│GENERATOR │ │
+│  │  QUERY    │    │               │    │                  │    │          │ │
+│  │           │    │ Embed query   │    │ Deduplicate by   │    │ Normal:  │ │
+│  │ Optional: │    │ (same model)  │    │  file:line key   │    │  gpt-4o  │ │
+│  │ • feature │    │               │    │                  │    │  1200 tok│ │
+│  │   mode    │    │ Cosine search │    │ Merge adjacent   │    │          │ │
+│  │ • top_k   │    │ top_k=5       │    │  chunks from     │    │ Fast:    │ │
+│  │ • language│    │               │    │  same file       │    │  gpt-4o- │ │
+│  │   filter  │    │ If score<0.5: │    │                  │    │  mini    │ │
+│  │ • stream  │    │  expand to 8  │    │ Token budget:    │    │  220 tok │ │
+│  │ • fast    │    │               │    │  8000 tokens max │    │          │ │
+│  │   mode    │    │ If 0 results: │    │                  │    │ Fallback:│ │
+│  │           │    │  expand to 20 │    │ Format:          │    │ Open-    │ │
+│  │           │    │  then scroll  │    │ File: path       │    │ Router   │ │
+│  │           │    │  fallback     │    │ Lines: start-end │    │ gpt-4o-  │ │
+│  │           │    │               │    │ Type: name       │    │ mini     │ │
+│  └──────────┘    └───────────────┘    └──────────────────┘    └────┬─────┘ │
+│                                                                    │       │
+│                    ┌───────────────────────────────────────────────▼─────┐ │
+│                    │                    RESPONSE                         │ │
+│                    │                                                     │ │
+│                    │  JSON: { answer, sources: [{file, start, end}] }   │ │
+│                    │  Stream: NDJSON (sources → answer_chunks → done)    │ │
+│                    └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why not LangChain?** Three reasons drove the custom build:
+
+1. **Syntax-aware chunking** — COBOL divisions/sections/paragraphs and C function boundaries require custom regex parsers. LangChain's splitters are generic (character/token/markdown) and would need heavy subclassing to preserve these code structure boundaries.
+2. **Citation metadata** — Every chunk carries `file_path`, `start_line`, `end_line`, `chunk_type`, and `name` through the entire pipeline into the final answer. LangChain's document format would need wrapping to preserve this.
+3. **Direct control** — Prompt shape, context assembly, streaming format, and provider fallback (OpenAI → OpenRouter) are explicit in a few focused modules. No chain abstraction between FastAPI routes and API calls.
+
 ## Architecture Decisions (and Why)
 
 1. **FastAPI backend (Python):** best ecosystem for RAG, async IO, and production APIs.

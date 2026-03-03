@@ -134,6 +134,7 @@ function App() {
   const [showDonutWindow, setShowDonutWindow] = useState(false)
   const [openDropdown, setOpenDropdown] = useState(null) // 'general' | 'explain' | ... | null
   const [windowPosition, setWindowPosition] = useState({ x: 96, y: 52 })
+  const [indexEmpty, setIndexEmpty] = useState(false)
 
   const terminalRef = useRef(null)
   const dragRef = useRef(null)
@@ -173,6 +174,7 @@ function App() {
     setAnswer('')
     setSources([])
     setTimings(null)
+    setIndexEmpty(false)
 
     try {
       const response = await fetch(`${API_BASE}/query`, {
@@ -201,6 +203,7 @@ function App() {
             const data = JSON.parse(line)
             if (data.type === 'sources') {
               setSources(data.sources || [])
+              setIndexEmpty(!!data.index_empty)
               setTimings((prev) => ({ ...prev, retrieval_ms: Math.round(data.retrieval_time_ms || 0) }))
             } else if (data.type === 'answer_chunk') {
               answerText += data.content
@@ -226,6 +229,7 @@ function App() {
         }
         setAnswer(data.answer || '')
         setSources(data.sources || [])
+        if (data.sources?.length === 0 && data.answer?.includes('No code indexed')) setIndexEmpty(true)
         setTimings({
           retrieval_ms: Math.round(data.retrieval_time_ms || 0),
           total_ms: Math.round(data.total_time_ms || 0),
@@ -441,6 +445,17 @@ function App() {
               <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} />
 
               {error && <div className="error-box">[ERROR] {error}</div>}
+
+              {!loading && sources.length === 0 && (answer || indexEmpty) && (answer?.includes('No code indexed') || answer?.includes('Something went wrong') || indexEmpty) && (
+                <div className="reindex-cta">
+                  <p className="reindex-cta-text">
+                    {answer?.includes('Something went wrong') ? 'Something went wrong. Run REINDEX to refresh the index, or try rephrasing your query.' : 'No code indexed yet. Click REINDEX in the title bar above to ingest the codebase, then try your query again.'}
+                  </p>
+                  <button type="button" className="reindex-cta-btn" onClick={handleIngest} disabled={loading}>
+                    {loading ? 'Indexing…' : 'Run REINDEX'}
+                  </button>
+                </div>
+              )}
 
               {(answer || sources.length > 0 || loading) && (
                 <div className="panels-grid">
