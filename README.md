@@ -2,6 +2,26 @@
 
 > RAG-powered system for navigating large legacy enterprise codebases through natural language.
 
+## MVP Status (Based on Week 3 + Pre-Search Docs)
+
+Current status against core MVP requirements:
+
+- ✅ Ingest at least one legacy codebase (GnuCOBOL)
+- ✅ Natural language query interface (web UI + API)
+- ✅ Vector retrieval with citations (file + line references in sources)
+- ✅ End-to-end RAG flow (embed -> retrieve -> generate)
+- ✅ Public deployment path (Railway config included)
+- ⚠️ Public deploy health depends on valid Railway env values (`OPENAI_API_KEY`, `QDRANT_URL`, optional `QDRANT_API_KEY`)
+
+Validation tooling added:
+
+- Backend tests: `python3 -m pytest -q backend/tests`
+- Basic eval runner (latency + source count + answer presence): `python3 evals/run_eval.py`
+
+If your Railway URL returns 502, the most common cause is environment value formatting or connectivity (especially Qdrant), not missing app code.
+
+---
+
 ## Instructions (Docker — one port)
 
 Everything runs on **port 8000**: UI, API, and health check.
@@ -27,12 +47,12 @@ Everything runs on **port 8000**: UI, API, and health check.
    ```bash
    ./start.sh
    ```
-   Or: `docker-compose up --build`
+   Or: `docker compose up --build`
 
 5. **Verify**
-   - **UI**: http://localhost:8000  
-   - **Health**: http://localhost:8000/api/health  
-   - **API docs**: http://localhost:8000/docs  
+   - **UI**: http://localhost:8000
+   - **Health**: http://localhost:8000/api/health
+   - **API docs**: http://localhost:8000/docs
 
 6. **Ingest the codebase** (once the app is up)
    ```bash
@@ -41,6 +61,60 @@ Everything runs on **port 8000**: UI, API, and health check.
    ```
 
 7. **Query** in the browser at http://localhost:8000 or via API (see **Example questions** below).
+
+---
+
+## How to Use LegacyLens (Local + Web)
+
+### Local (recommended)
+
+```bash
+git clone https://github.com/s85191939/LegacyLens.git
+cd LegacyLens
+git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol
+cp .env.example .env
+# set OPENAI_API_KEY in .env
+./start.sh
+```
+
+Use:
+
+- App UI: `http://localhost:8000`
+- Health: `http://localhost:8000/api/health`
+- Ingest: `POST http://localhost:8000/api/ingest` body `{"reingest": true}`
+- Query: UI or `POST http://localhost:8000/api/query`
+
+### Web (Railway)
+
+1. Open your deployed URL (example): `https://legacylens-production-fecf.up.railway.app/`
+2. Verify backend first: `https://.../api/health`
+3. If health returns JSON, run ingestion:
+   - `POST https://.../api/ingest` body `{"reingest": true}`
+4. Query through the web UI.
+
+Note: `degraded` means app is running but Qdrant is unavailable.
+
+---
+
+## Deploy on Railway
+
+1. **New project** -> Deploy from GitHub repo, use existing `Dockerfile` and `railway.json`.
+2. **Variables** (Railway dashboard -> your service -> Variables):
+   - `OPENAI_API_KEY` (required)
+   - `QDRANT_URL` (optional unless you need full RAG; e.g. `https://xxx.qdrant.io`)
+   - `QDRANT_API_KEY` (optional; only if your Qdrant requires auth)
+   - `QDRANT_COLLECTION` (default `legacylens`)
+3. **PORT** is set by Railway; app binds automatically.
+4. Without Qdrant the app runs in **degraded** mode (UI + health work; ingest/query disabled).
+
+### Railway Quick Fix Checklist (ASAP)
+
+1. Redeploy latest `main`.
+2. Re-save `OPENAI_API_KEY`.
+3. Re-save `QDRANT_URL` as a clean URL (no quotes/trailing spaces).
+4. If Qdrant does **not** require auth: remove `QDRANT_API_KEY`.
+5. If Qdrant **does** require auth: paste `QDRANT_API_KEY` as a single-line token.
+6. Confirm `GET /api/health` on Railway returns JSON (not 502).
 
 ---
 
@@ -61,100 +135,47 @@ Try these in the UI or via `POST /api/query`:
 
 ---
 
-## Overview
-
-LegacyLens makes the **GnuCOBOL** compiler codebase (~128K LOC, 432 files) queryable through natural language. It uses syntax-aware chunking, vector embeddings, and LLM-powered answer generation to help developers understand unfamiliar legacy code.
-
 ## Architecture
 
 | Component | Technology |
 |-----------|-----------|
-| Vector DB | Qdrant (self-hosted Docker) |
+| Vector DB | Qdrant |
 | Embeddings | OpenAI text-embedding-3-small (1536 dim) |
 | LLM | GPT-4o |
 | Chunking | COBOL paragraph-level + C function-level + fixed-size fallback |
 | Backend | FastAPI (Python) |
 | Frontend | React + Vite + Tailwind CSS |
-| Deployment | Docker Compose |
-
-## Deploy on Railway
-
-1. **New project** → Deploy from GitHub repo, use existing `Dockerfile` and `railway.json`.
-2. **Variables** (Railway dashboard → your service → Variables):
-   - `OPENAI_API_KEY` (required) — your OpenAI key.
-   - `QDRANT_URL` (optional) — e.g. `https://xxx.qdrant.io` if using [Qdrant Cloud](https://cloud.qdrant.io/).
-   - `QDRANT_API_KEY` (optional) — required if using Qdrant Cloud.
-3. **PORT** is set by Railway; the app binds to it automatically.
-4. Without Qdrant the app runs in **degraded** mode (UI and health work; ingest/query need Qdrant). Add a Qdrant Cloud instance and set the variables above to enable full RAG.
-5. Health check: Railway uses `/api/health` (or `/health`). The app binds to `PORT` and starts within a few seconds; Qdrant connection is tried with a short timeout so the deploy does not hang.
-
-**If you see "Application failed to respond":** Open the service **Deploy logs** in Railway. Confirm the log line `Starting on 0.0.0.0:<port>` appears and that no Python traceback follows. Set `OPENAI_API_KEY` in Variables (required). The app responds with HTTP 200 even when Qdrant is unavailable (degraded mode).
-
-## Quick Start
-
-**Prerequisites:** Docker & Docker Compose, OpenAI API key.
-
-See **[Instructions (Docker — one port)](#instructions-docker--one-port)** above for the full step-by-step. In short: clone repo and codebase, set `OPENAI_API_KEY` in `.env`, run `./start.sh`, then open http://localhost:8000. Use http://localhost:8000/api/health to verify. Ingest once with `POST /api/ingest`, then query via the UI or `POST /api/query`.
-
-## Local Development
-
-Run all commands from the **project root** (`LegacyLens/`), not from `backend/` or `frontend/`.
-
-### Backend
-
-```bash
-# From project root (LegacyLens/)
-pip install -r backend/requirements.txt
-
-# In another terminal: start Qdrant
-docker run -p 6333:6333 qdrant/qdrant:latest
-
-# Run backend (must be from project root so "backend" package is found)
-uvicorn backend.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-# From project root
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend dev server runs at http://localhost:3000 and proxies `/api` to the backend at http://localhost:8000.
+| Deployment | Docker Compose / Railway |
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check + Qdrant status |
+| GET | `/health` | Health alias (Railway-friendly) |
 | GET | `/api/stats` | Collection statistics |
 | POST | `/api/ingest` | Trigger codebase ingestion |
 | GET | `/api/ingest/status` | Check ingestion progress |
 | POST | `/api/query` | Natural language query |
 
-## Code Understanding Features
+## Local Development (Without Docker)
 
-- **Code Explanation** - Plain English explanation of functions/sections
-- **Dependency Mapping** - PERFORM/CALL/COPY analysis
-- **Pattern Detection** - Find similar code patterns across the codebase
-- **Documentation Gen** - Generate documentation for undocumented code
-- **Business Logic Extract** - Identify and explain business rules
+Run all commands from project root (`LegacyLens/`).
 
-## Performance Targets
+### Backend
 
-| Metric | Target |
-|--------|--------|
-| Query latency | <3 seconds end-to-end |
-| Retrieval precision | >70% relevant chunks in top-5 |
-| Codebase coverage | 100% of files indexed |
-| Ingestion throughput | 10,000+ LOC in <5 minutes |
+```bash
+pip install -r backend/requirements.txt
+docker run -d -p 6333:6333 qdrant/qdrant:latest
+uvicorn backend.main:app --reload --port 8000
+```
 
-## Chunking Strategy
+### Frontend
 
-1. **COBOL files**: Paragraph-level chunking (DIVISION/SECTION/PARAGRAPH boundaries)
-2. **C files**: Function-level chunking
-3. **Fallback**: Fixed-size (800 tokens) with 15% overlap
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-Each chunk preserves metadata: file path, line numbers, function/paragraph name, division, section, dependencies.
+Frontend dev server runs at http://localhost:3000 and proxies `/api` to backend at port 8000.
