@@ -1,6 +1,5 @@
 """LLM answer generation with citations and code understanding features."""
 
-import json
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
@@ -60,12 +59,39 @@ Format as clear documentation comments.""",
 
 
 class Generator:
-    """LLM-powered answer generation with code understanding features."""
+    """LLM-powered answer generation with OpenRouter fallback."""
 
     def __init__(self):
         settings = get_settings()
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.llm_model
+
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+        self.openrouter_api_key = settings.openrouter_api_key
+        self.openrouter_model = settings.openrouter_model
+        self.openrouter_base_url = settings.openrouter_base_url
+        self.openrouter_client = None
+
+        if self.openrouter_api_key:
+            self.openrouter_client = AsyncOpenAI(
+                api_key=self.openrouter_api_key,
+                base_url=self.openrouter_base_url,
+            )
+
+    def _should_fallback(self, exc: Exception) -> bool:
+        """Fallback on provider throttling/quota/provider errors."""
+        text = str(exc).lower()
+        fallback_signals = [
+            "rate limit",
+            "429",
+            "quota",
+            "insufficient_quota",
+            "too many requests",
+            "temporarily unavailable",
+            "overloaded",
+            "upstream",
+        ]
+        return any(signal in text for signal in fallback_signals)
 
     async def generate_answer(
         self,
@@ -75,20 +101,6 @@ class Generator:
         feature: Optional[str] = None,
         stream: bool = False,
     ) -> Union[str, AsyncGenerator[str, None]]:
-        """
-        Generate an answer using the LLM with retrieved context.
-
-        Args:
-            query: User's natural language query
-            context: Assembled context from retrieval
-            sources: Source metadata for citations
-            feature: Optional code understanding feature to activate
-            stream: If True, return an async generator for streaming
-
-        Returns:
-            Generated answer string, or async generator if streaming
-        """
-        # Build the prompt
         feature_instruction = ""
         if feature and feature in FEATURE_PROMPTS:
             feature_instruction = f"\n\nAdditional instruction: {FEATURE_PROMPTS[feature]}"
@@ -110,34 +122,61 @@ Please provide a comprehensive answer with specific file and line references."""
 
         if stream:
             return self._stream_response(messages)
-        else:
-            return await self._complete_response(messages)
+        return await self._complete_response(messages)
 
     async def _complete_response(self, messages: list) -> str:
-        """Generate a complete response."""
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.1,
-            max_tokens=2000,
-        )
-        return response.choices[0].message.content
+        """Generate complete response with OpenRouter fallback."""
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=2000,
+            )
+            return response.choices[0].message.content
+        except Exception as exc:
+            if self.openrouter_client and self._should_fallback(exc):
+                logger.warning("OpenAI failed (%s). Falling back to OpenRouter.", exc)
+                response = await self.openrouter_client.chat.completions.create(
+                    model=self.openrouter_model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=2000,
+                )
+                return response.choices[0].message.content
+            raise
 
     async def _stream_response(self, messages: list) -> AsyncGenerator[str, None]:
-        """Generate a streaming response."""
-        stream = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.1,
-            max_tokens=2000,
-            stream=True,
-        )
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+        """Generate streaming response with OpenRouter fallback."""
+        try:
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=2000,
+                stream=True,
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+            return
+        except Exception as exc:
+            if not (self.openrouter_client and self._should_fallback(exc)):
+                raise
+
+            logger.warning("OpenAI stream failed (%s). Falling back to OpenRouter stream.", exc)
+            stream = await self.openrouter_client.chat.completions.create(
+                model=self.openrouter_model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=2000,
+                stream=True,
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
 
     def _format_source_list(self, sources: List[Dict[str, Any]]) -> str:
-        """Format sources list for the prompt."""
         lines = []
         for i, src in enumerate(sources, 1):
             line = f"{i}. File: {src['file_path']} | Lines: {src['start_line']}-{src['end_line']}"

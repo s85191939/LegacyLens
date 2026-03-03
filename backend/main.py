@@ -32,16 +32,19 @@ async def lifespan(app: FastAPI):
 
     embedder = Embedder()
     store = QdrantStore()
-
     app.state.qdrant_connected = False
-    try:
-      # Prevent Railway startup hangs if Qdrant is slow/unreachable.
-      await asyncio.wait_for(store.initialize(), timeout=8)
-      app.state.qdrant_connected = True
-      logger.info("Qdrant connected successfully")
-    except Exception as exc:
-      logger.warning("Qdrant unavailable on startup: %s", exc)
-      logger.warning("App will start in degraded mode; query/ingest disabled until Qdrant is reachable")
+
+    async def init_qdrant():
+        try:
+            await asyncio.wait_for(store.initialize(), timeout=10)
+            app.state.qdrant_connected = True
+            logger.info("Qdrant connected successfully")
+        except Exception as exc:
+            logger.warning("Qdrant unavailable on startup: %s", exc)
+            logger.warning("App running in degraded mode; query/ingest disabled until Qdrant is reachable")
+
+    # Start Qdrant init in background so the server listens immediately (Railway health check)
+    asyncio.create_task(init_qdrant())
 
     retriever = Retriever(embedder=embedder, store=store)
     generator = Generator()
@@ -53,7 +56,7 @@ async def lifespan(app: FastAPI):
     app.state.generator = generator
     app.state.pipeline = pipeline
 
-    logger.info("LegacyLens ready")
+    logger.info("LegacyLens ready (Qdrant connecting in background)")
     yield
 
     try:

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import QueryInput from './components/QueryInput'
 import AnswerPanel from './components/AnswerPanel'
 import ResultsPanel from './components/ResultsPanel'
@@ -132,6 +132,21 @@ function App() {
   const [isMinimized, setIsMinimized] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
   const [showDonutWindow, setShowDonutWindow] = useState(false)
+  const [openDropdown, setOpenDropdown] = useState(null) // 'general' | 'explain' | ... | null
+  const [windowPosition, setWindowPosition] = useState({ x: 96, y: 52 })
+
+  const terminalRef = useRef(null)
+  const dragRef = useRef(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (openDropdown == null) return
+    const close = (e) => {
+      if (!e.target.closest('.feature-dropdown-wrap')) setOpenDropdown(null)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [openDropdown])
 
   useEffect(() => {
     fetch(`${API_BASE}/health`)
@@ -143,6 +158,13 @@ function App() {
   useEffect(() => {
     const t = setInterval(() => setMenuTime(formatMenuTime(new Date())), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('mousemove', handleWindowDrag)
+      window.removeEventListener('mouseup', endWindowDrag)
+    }
   }, [])
 
   const handleQuery = async (queryText) => {
@@ -243,13 +265,40 @@ function App() {
     setIsMinimized(false)
   }
 
+  const endWindowDrag = () => {
+    dragRef.current = null
+    window.removeEventListener('mousemove', handleWindowDrag)
+    window.removeEventListener('mouseup', endWindowDrag)
+  }
+
+  const handleWindowDrag = (event) => {
+    if (!dragRef.current || !terminalRef.current || isMaximized) return
+    const rect = terminalRef.current.getBoundingClientRect()
+    const maxX = Math.max(8, window.innerWidth - rect.width - 8)
+    const maxY = Math.max(36, window.innerHeight - rect.height - 8)
+    const nextX = Math.min(maxX, Math.max(8, event.clientX - dragRef.current.offsetX))
+    const nextY = Math.min(maxY, Math.max(36, event.clientY - dragRef.current.offsetY))
+    setWindowPosition({ x: nextX, y: nextY })
+  }
+
+  const startWindowDrag = (event) => {
+    if (event.button !== 0 || isMaximized || !terminalRef.current) return
+    const rect = terminalRef.current.getBoundingClientRect()
+    dragRef.current = {
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    }
+    window.addEventListener('mousemove', handleWindowDrag)
+    window.addEventListener('mouseup', endWindowDrag)
+  }
+
   return (
     <div className="desktop-shell">
-      {/* Top menu bar: rainbow banana logo (left) + toolbar + time (right) */}
-      <header className="menu-bar">
+      {/* Toolbar: banana logo (image joke) + app menu + time */}
+      <header className="menu-bar banana-toolbar" aria-label="App toolbar">
         <div className="menu-bar-left">
           <span className="menu-bar-logo" aria-hidden="true">
-            <svg className="rainbow-banana-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="rainbow-banana-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
               <defs>
                 <linearGradient id="menu-banana-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#22c55e" />
@@ -260,10 +309,14 @@ function App() {
                   <stop offset="100%" stopColor="#3b82f6" />
                 </linearGradient>
               </defs>
-              <path fill="url(#menu-banana-rainbow)" d="M6 8 Q4 16 7 24 Q11 28 17 26 Q24 24 26 16 Q26 8 20 4 Q14 0 8 4 Q6 6 6 8 Z" />
-              <text x="16" y="18" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">?</text>
+              {/* Curved banana shape (stem left, tip right) */}
+              <path
+                fill="url(#menu-banana-rainbow)"
+                d="M6 8 C8 4 16 2 24 8 C30 14 28 22 22 26 C14 28 6 22 6 16 C6 12 6 8 6 8 Z"
+              />
             </svg>
           </span>
+          <span className="menu-bar-sep" aria-hidden="true">|</span>
           <nav className="menu-bar-toolbar" aria-label="Main menu">
             <span className="menu-bar-item menu-bar-app">LegacyLens</span>
             <button type="button" className="menu-bar-item">File</button>
@@ -297,9 +350,13 @@ function App() {
       </div>
 
       {showTerminal && (
-        <div className={`terminal-window ${isMaximized ? 'maximized' : ''}`}>
-          <div className="window-bar">
-            <div className="window-dots">
+        <div
+          ref={terminalRef}
+          className={`terminal-window ${isMaximized ? 'maximized' : ''}`}
+          style={isMaximized ? undefined : { left: `${windowPosition.x}px`, top: `${windowPosition.y}px` }}
+        >
+          <div className="window-bar" onMouseDown={startWindowDrag}>
+            <div className="window-dots" onMouseDown={(e) => e.stopPropagation()}>
               <button className="dot red" title="Close" onClick={() => setShowTerminal(false)} />
               <button
                 className="dot amber"
@@ -313,7 +370,7 @@ function App() {
               />
             </div>
             <div className="window-title">LegacyLens :: Terminal</div>
-            <button onClick={handleIngest} disabled={loading} className="mini-btn">
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={handleIngest} disabled={loading} className="mini-btn">
               {loading ? 'BUSY' : 'REINDEX'}
             </button>
           </div>
@@ -334,30 +391,52 @@ function App() {
 
               <div className="feature-row">
                 <span className="feature-row-label">Query mode:</span>
-                {FEATURES_WITH_PROMPTS.map((f) => (
-                  <select
-                    key={f.id ?? 'general'}
-                    className={`feature-dropdown ${feature === f.id ? 'active' : ''}`}
-                    value=""
-                    onChange={(e) => {
-                      const prompt = e.target.value
-                      if (!prompt) return
-                      setFeature(f.id)
-                      setQuery(prompt)
-                      handleQuery(prompt)
-                      e.target.value = ''
-                    }}
-                    title={`Choose a ${f.label} prompt`}
-                    aria-label={`${f.label} prompts`}
-                  >
-                    <option value="">{f.label}</option>
-                    {f.prompts.map((p) => (
-                      <option key={p} value={p}>
-                        {p.length > 45 ? p.slice(0, 42) + '…' : p}
-                      </option>
-                    ))}
-                  </select>
-                ))}
+                {FEATURES_WITH_PROMPTS.map((f) => {
+                  const key = f.id ?? 'general'
+                  const isOpen = openDropdown === key
+                  return (
+                    <div key={key} className="feature-dropdown-wrap">
+                      <button
+                        type="button"
+                        className={`feature-chip ${feature === f.id ? 'active' : ''} ${isOpen ? 'open' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpenDropdown(isOpen ? null : key)
+                        }}
+                        aria-expanded={isOpen}
+                        aria-haspopup="listbox"
+                        aria-label={`${f.label} prompts`}
+                      >
+                        {f.label}
+                        <span className="feature-chip-chevron" aria-hidden>▾</span>
+                      </button>
+                      {isOpen && (
+                        <div className="feature-panel" role="listbox">
+                          <div className="feature-panel-title">{f.label}</div>
+                          <div className="feature-panel-list">
+                            {f.prompts.map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                className="feature-panel-item"
+                                role="option"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setFeature(f.id)
+                                  setQuery(p)
+                                  handleQuery(p)
+                                  setOpenDropdown(null)
+                                }}
+                              >
+                                {p}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
               <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} />

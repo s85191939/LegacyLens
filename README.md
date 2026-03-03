@@ -1,73 +1,104 @@
 # LegacyLens
 
 > RAG-powered system for navigating large legacy enterprise codebases through natural language.
-https://legacylens-production-9547.up.railway.app/
 
-## MVP Status (Based on Week 3 + Pre-Search Docs)
+**Live App:** [https://legacylens-production-9547.up.railway.app/](https://legacylens-production-9547.up.railway.app/)
 
-Current status against core MVP requirements:
+LegacyLens is a retrieval-augmented code intelligence system for legacy codebases.
+It ingests large repos (currently GnuCOBOL), chunks and embeds source files, stores vectors in Qdrant, and answers natural-language questions with cited code locations.
 
-- ✅ Ingest at least one legacy codebase (GnuCOBOL)
-- ✅ Natural language query interface (web UI + API)
-- ✅ Vector retrieval with citations (file + line references in sources)
-- ✅ End-to-end RAG flow (embed -> retrieve -> generate)
-- ✅ Public deployment path (Railway config included)
-- ⚠️ Public deploy health depends on valid Railway env values (`OPENAI_API_KEY`, `QDRANT_URL`, optional `QDRANT_API_KEY`)
+## Why This Exists
 
-Validation tooling added:
+Legacy enterprise systems are usually hard to onboard, hard to search semantically, and expensive to hand over across teams. LegacyLens is designed to make legacy code exploration fast, explainable, and deployable with minimal infrastructure.
 
-- Backend tests: `python3 -m pytest -q backend/tests`
-- Basic eval runner (latency + source count + answer presence): `python3 evals/run_eval.py`
+## What `REINDEX` Does
 
-If your Railway URL returns 502, the most common cause is environment value formatting or connectivity (especially Qdrant), not missing app code.
+The **REINDEX** button in the UI triggers:
 
----
+1. `POST /api/ingest` with `{"reingest": true}`
+2. Background ingestion pipeline starts (non-blocking API)
+3. Existing Qdrant collection is dropped and recreated
+4. Codebase is scanned and preprocessed
+5. Files are chunked by language-aware + fallback chunking
+6. Chunks are embedded via OpenAI embeddings
+7. New vectors + metadata are upserted into Qdrant
 
-## Instructions (Docker — one port)
+Net effect: full rebuild of the searchable vector index from source-of-truth code.
 
-Everything runs on **port 8000**: UI, API, and health check.
+## System Architecture
 
-1. **Clone and enter the repo**
-   ```bash
-   git clone https://github.com/s85191939/LegacyLens.git
-   cd LegacyLens
-   ```
+```mermaid
+flowchart LR
+    U["Web UI (React + Vite)"] -->|"/api/query"| A["FastAPI Backend"]
+    U -->|"/api/ingest"| A
+    A --> I["Ingestion Pipeline\nscan -> preprocess -> chunk -> embed -> upsert"]
+    I --> E["Embedding Provider\nOpenAI text-embedding-3-small"]
+    E --> Q["Qdrant Vector DB"]
+    A --> R["Retriever\nvector similarity + metadata"]
+    R --> Q
+    R --> G["Generator\nLLM answer + citations"]
+    G --> L["LLM Provider\nOpenAI (OpenRouter fallback)"]
+    G --> U
+```
 
-2. **Clone the target codebase**
-   ```bash
-   git clone --depth 1 https://github.com/OCamlPro/gnucobol.git codebase/gnucobol
-   ```
+## Request Lifecycle
 
-3. **Create `.env` and set your OpenAI API key**
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and set `OPENAI_API_KEY=sk-your-key`.
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as React UI
+    participant API as FastAPI
+    participant RET as Retriever
+    participant QD as Qdrant
+    participant LLM as LLM Provider
 
-4. **Start the app**
-   ```bash
-   ./start.sh
-   ```
-   Or: `docker compose up --build`
+    User->>UI: Ask question
+    UI->>API: POST /api/query
+    API->>RET: retrieve(query)
+    RET->>QD: similarity search
+    QD-->>RET: top-k chunks + metadata
+    RET-->>API: ranked context
+    API->>LLM: generate answer with context
+    LLM-->>API: answer text
+    API-->>UI: stream/JSON response + sources
+    UI-->>User: answer + cited files/lines
+```
 
-5. **Verify**
-   - **UI**: http://localhost:8000
-   - **Health**: http://localhost:8000/api/health
-   - **API docs**: http://localhost:8000/docs
+## Architecture Decisions (and Why)
 
-6. **Ingest the codebase** (once the app is up)
-   ```bash
-   curl -X POST http://localhost:8000/api/ingest -H "Content-Type: application/json" -d '{"reingest": true}'
-   curl http://localhost:8000/api/ingest/status
-   ```
+1. **FastAPI backend (Python):** best ecosystem for RAG, async IO, and production APIs.
+2. **React frontend:** fast iteration for demo UX and straightforward deployment as static assets.
+3. **Qdrant for vectors:** strong filtering + metadata support and cloud-hosted portability.
+4. **Background ingestion:** avoids request timeouts during long index builds.
+5. **Degraded startup mode:** app can boot even when vector DB is temporarily unavailable.
+6. **Provider abstraction:** OpenAI primary with OpenRouter fallback to reduce provider lock-in.
 
-7. **Query** in the browser at http://localhost:8000 or via API (see **Example questions** below).
+## Portability and Deployment Model
 
----
+- **Local:** Docker Compose (`./start.sh`) for one-command startup.
+- **Cloud:** Railway via Docker image and env-driven config.
+- **Vector DB:** swap local Qdrant container or managed cloud endpoint by env vars only.
+- **Model provider:** switch behavior via environment without changing endpoint contracts.
 
-## How to Use LegacyLens (Local + Web)
+This keeps the same core architecture runnable across laptop dev, hackathon demo, and public cloud.
 
-### Local (recommended)
+## Languages and Stack Used
+
+- **Python**: backend APIs, ingestion pipeline, retrieval/generation orchestration
+- **JavaScript (React)**: frontend UI and interactions
+- **CSS**: custom desktop/terminal interface styling
+- **Docker**: portable runtime packaging
+- **Qdrant**: vector indexing and retrieval
+
+## API Endpoints
+
+- `GET /api/health` - service + vector DB status
+- `GET /api/stats` - collection statistics
+- `POST /api/ingest` - start ingestion/reindex
+- `GET /api/ingest/status` - ingestion progress + last stats
+- `POST /api/query` - RAG query (streaming or non-streaming)
+
+## Local Run
 
 ```bash
 git clone https://github.com/s85191939/LegacyLens.git
@@ -78,105 +109,31 @@ cp .env.example .env
 ./start.sh
 ```
 
-Use:
+Open:
 
-- App UI: `http://localhost:8000`
+- UI: `http://localhost:8000`
 - Health: `http://localhost:8000/api/health`
-- Ingest: `POST http://localhost:8000/api/ingest` body `{"reingest": true}`
-- Query: UI or `POST http://localhost:8000/api/query`
 
-### Web (Railway)
+## Project Evolution (Developer History)
 
-1. Open your deployed URL (example): `https://legacylens-production-fecf.up.railway.app/`
-2. Verify backend first: `https://.../api/health`
-3. If health returns JSON, run ingestion:
-   - `POST https://.../api/ingest` body `{"reingest": true}`
-4. Query through the web UI.
+LegacyLens has evolved through fast MVP iterations:
 
-Note: `degraded` means app is running but Qdrant is unavailable.
+1. Core RAG skeleton (scan/chunk/embed/retrieve/generate)
+2. Qdrant-backed vector search with source citations
+3. Public deployment hardening for Railway startup behavior
+4. Retro desktop-style UI with operational controls (`REINDEX`, status)
+5. Test coverage for config/health/vector integration paths
 
----
+The current architecture reflects a practical tradeoff: fast iteration speed now, with clean seams (vector store + model provider + deployment) for future scale.
 
-## Deploy on Railway
+## MVP Status (Current)
 
-1. **New project** -> Deploy from GitHub repo, use existing `Dockerfile` and `railway.json`.
-2. **Variables** (Railway dashboard -> your service -> Variables):
-   - `OPENAI_API_KEY` (required)
-   - `QDRANT_URL` (optional unless you need full RAG; e.g. `https://xxx.qdrant.io`)
-   - `QDRANT_API_KEY` (optional; only if your Qdrant requires auth)
-   - `QDRANT_COLLECTION` (default `legacylens`)
-3. **PORT** is set by Railway; app binds automatically.
-4. Without Qdrant the app runs in **degraded** mode (UI + health work; ingest/query disabled).
+**Meets MVP for a pre-production RAG explorer:**
 
-### Railway Quick Fix Checklist (ASAP)
+- Ingests a real legacy codebase
+- Supports natural-language question answering
+- Returns cited source context
+- Exposes web UI + API surface
+- Runs locally and on public cloud endpoint
 
-1. Redeploy latest `main`.
-2. Re-save `OPENAI_API_KEY`.
-3. Re-save `QDRANT_URL` as a clean URL (no quotes/trailing spaces).
-4. If Qdrant does **not** require auth: remove `QDRANT_API_KEY`.
-5. If Qdrant **does** require auth: paste `QDRANT_API_KEY` as a single-line token.
-6. Confirm `GET /api/health` on Railway returns JSON (not 502).
-
----
-
-## Example questions
-
-Try these in the UI or via `POST /api/query`:
-
-1. Where is the main entry point of the compiler?
-2. How does COBOL file I/O work?
-3. What error handling patterns are used?
-4. Show me the parser implementation.
-5. How are COBOL divisions and sections parsed?
-6. Where is symbol table or name resolution handled?
-7. How does the code generator emit output?
-8. What data structures represent the AST or parse tree?
-9. How are COPY and REPLACING directives processed?
-10. Where is numeric or decimal arithmetic implemented?
-
----
-
-## Architecture
-
-| Component | Technology |
-|-----------|-----------|
-| Vector DB | Qdrant |
-| Embeddings | OpenAI text-embedding-3-small (1536 dim) |
-| LLM | GPT-4o |
-| Chunking | COBOL paragraph-level + C function-level + fixed-size fallback |
-| Backend | FastAPI (Python) |
-| Frontend | React + Vite + Tailwind CSS |
-| Deployment | Docker Compose / Railway |
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check + Qdrant status |
-| GET | `/health` | Health alias (Railway-friendly) |
-| GET | `/api/stats` | Collection statistics |
-| POST | `/api/ingest` | Trigger codebase ingestion |
-| GET | `/api/ingest/status` | Check ingestion progress |
-| POST | `/api/query` | Natural language query |
-
-## Local Development (Without Docker)
-
-Run all commands from project root (`LegacyLens/`).
-
-### Backend
-
-```bash
-pip install -r backend/requirements.txt
-docker run -d -p 6333:6333 qdrant/qdrant:latest
-uvicorn backend.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend dev server runs at http://localhost:3000 and proxies `/api` to backend at port 8000.
+Remaining work is scale/reliability polish, not missing core MVP capability.

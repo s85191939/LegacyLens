@@ -13,8 +13,10 @@ HEALTH_CHECK_TIMEOUT = 3.0
 @router.get("/api/health")
 @router.get("/health")  # alias for Railway / load balancers that check /health
 async def health_check(request: Request):
-    """Health check endpoint. Returns 200 quickly; Qdrant check is time-limited."""
-    store = request.app.state.store
+    """Health check endpoint. Always returns 200 quickly; Qdrant check is time-limited."""
+    store = getattr(request.app.state, "store", None)
+    if store is None:
+        return {"status": "starting", "qdrant": "pending", "collection": {}}
 
     try:
         info = await asyncio.wait_for(

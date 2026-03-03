@@ -11,19 +11,32 @@ class Settings(BaseSettings):
 
     # API Keys
     openai_api_key: str = ""
+    openrouter_api_key: str = ""
 
     # Qdrant
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""  # Required for Qdrant Cloud
     qdrant_collection: str = "legacylens"
 
-    @field_validator("openai_api_key", "qdrant_api_key", mode="before")
+    @field_validator("openai_api_key", "openrouter_api_key", "qdrant_api_key", mode="before")
     @classmethod
-    def strip_api_keys(cls, v):
-        """Strip whitespace/newlines so pasted keys (e.g. in Railway) work."""
-        if v is None:
+    def normalize_api_keys(cls, value):
+        """Normalize keys by removing all whitespace/newlines from pasted secrets."""
+        if value is None:
             return ""
-        return v.strip() if isinstance(v, str) else v
+        if isinstance(value, str):
+            return "".join(value.split())
+        return value
+
+    @field_validator("qdrant_url", mode="before")
+    @classmethod
+    def normalize_qdrant_url(cls, value):
+        """Trim accidental leading/trailing spaces around URL."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
     # Embedding
     embedding_model: str = "text-embedding-3-small"
@@ -31,6 +44,10 @@ class Settings(BaseSettings):
 
     # LLM
     llm_model: str = "gpt-4o"
+
+    # OpenRouter fallback
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "openai/gpt-4o-mini"
 
     # Chunking
     chunk_size: int = 800  # tokens
