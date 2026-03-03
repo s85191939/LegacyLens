@@ -1,6 +1,6 @@
 """Ingestion endpoint - triggers codebase ingestion pipeline."""
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
@@ -55,6 +55,12 @@ async def ingest_codebase(
     background_tasks: BackgroundTasks,
 ):
     """Trigger ingestion of the codebase."""
+    if not getattr(request.app.state, "qdrant_connected", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Qdrant vector database is not connected. Please check QDRANT_URL and QDRANT_API_KEY settings.",
+        )
+
     if _ingestion_status["running"]:
         return IngestResponse(
             status="already_running",

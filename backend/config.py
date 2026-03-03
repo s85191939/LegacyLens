@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # Qdrant
     qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""  # Required for Qdrant Cloud
     qdrant_collection: str = "legacylens"
 
     # Embedding

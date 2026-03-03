@@ -1,7 +1,7 @@
 """Query endpoint - natural language search and answer generation."""
 
 import time
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
@@ -51,6 +51,13 @@ async def query_codebase(request: Request, body: QueryRequest):
     """
     start_time = time.time()
 
+    # Check if Qdrant is connected
+    if not getattr(request.app.state, "qdrant_connected", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Qdrant vector database is not connected. Please check QDRANT_URL and QDRANT_API_KEY settings.",
+        )
+
     retriever = request.app.state.retriever
     generator = request.app.state.generator
 
@@ -64,9 +71,33 @@ async def query_codebase(request: Request, body: QueryRequest):
 
     if not retrieval_result.sources:
         total_ms = (time.time() - start_time) * 1000
+        no_results_answer = "No relevant code found. Try rephrasing your query or broadening the search."
+
+        if body.stream:
+            # Must return NDJSON format when stream was requested
+            async def empty_stream():
+                yield json.dumps({
+                    "type": "sources",
+                    "sources": [],
+                    "retrieval_time_ms": retrieval_result.retrieval_time_ms,
+                }) + "\n"
+                yield json.dumps({
+                    "type": "answer_chunk",
+                    "content": no_results_answer,
+                }) + "\n"
+                yield json.dumps({
+                    "type": "done",
+                    "total_time_ms": total_ms,
+                }) + "\n"
+
+            return StreamingResponse(
+                empty_stream(),
+                media_type="application/x-ndjson",
+            )
+
         return QueryResponse(
             query=body.query,
-            answer="No relevant code found. Try rephrasing your query or broadening the search.",
+            answer=no_results_answer,
             sources=[],
             retrieval_time_ms=retrieval_result.retrieval_time_ms,
             total_time_ms=total_ms,

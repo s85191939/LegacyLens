@@ -43,7 +43,14 @@ class QdrantStore:
 
     def __init__(self):
         settings = get_settings()
-        self.client = AsyncQdrantClient(url=settings.qdrant_url)
+        # Support Qdrant Cloud with API key authentication
+        if settings.qdrant_api_key:
+            self.client = AsyncQdrantClient(
+                url=settings.qdrant_url,
+                api_key=settings.qdrant_api_key,
+            )
+        else:
+            self.client = AsyncQdrantClient(url=settings.qdrant_url)
         self.collection_name = settings.qdrant_collection
         self.vector_dim = settings.embedding_dim
 
