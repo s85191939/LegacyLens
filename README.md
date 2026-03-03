@@ -7,6 +7,8 @@
 LegacyLens is a retrieval-augmented code intelligence system for legacy codebases.
 It ingests large repos (currently GnuCOBOL), chunks and embeds source files, stores vectors in Qdrant, and answers natural-language questions with cited code locations.
 
+<img width="1728" height="900" alt="Screenshot 2026-03-02 at 11 46 15 PM" src="https://github.com/user-attachments/assets/8038119d-0a10-44a4-b6c6-af3f7554d509" />
+
 ## Why This Exists
 
 Legacy enterprise systems are usually hard to onboard, hard to search semantically, and expensive to hand over across teams. LegacyLens is designed to make legacy code exploration fast, explainable, and deployable with minimal infrastructure.
