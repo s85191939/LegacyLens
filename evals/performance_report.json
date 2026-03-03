@@ -1,0 +1,95 @@
+{
+  "api_base": "http://localhost:8000",
+  "health": {
+    "status": "healthy",
+    "qdrant": "connected",
+    "collection": {
+      "name": "legacylens",
+      "points_count": 1788,
+      "vectors_count": null,
+      "status": "green"
+    }
+  },
+  "targets": {
+    "query_latency_ms_p95": 3000,
+    "retrieval_precision_top5": 0.7,
+    "codebase_coverage": 1.0,
+    "ingestion_max_seconds": 300,
+    "ingestion_min_lines": 10000,
+    "answer_accuracy": 1.0
+  },
+  "metrics": {
+    "query_latency_ms_p95": 239.53,
+    "query_latency_ms_mean": 206.76,
+    "retrieval_precision_top5": 0.96,
+    "codebase_coverage": 1.0,
+    "ingestion_duration_seconds": 18.64,
+    "ingestion_total_lines": 132166,
+    "answer_accuracy": 1.0
+  },
+  "gates": {
+    "query_latency": true,
+    "retrieval_precision": true,
+    "codebase_coverage": true,
+    "ingestion_throughput": true,
+    "answer_accuracy": true
+  },
+  "passed": true,
+  "queries": [
+    {
+      "query": "Where is the main entry point of the compiler?",
+      "status_code": 200,
+      "latency_ms": 240.75,
+      "top5_returned": 5,
+      "top5_relevant": 5,
+      "citation_ok": true
+    },
+    {
+      "query": "Show parser implementation flow.",
+      "status_code": 200,
+      "latency_ms": 233.47,
+      "top5_returned": 5,
+      "top5_relevant": 5,
+      "citation_ok": true
+    },
+    {
+      "query": "How does error handling work in gnucobol?",
+      "status_code": 200,
+      "latency_ms": 212.21,
+      "top5_returned": 5,
+      "top5_relevant": 5,
+      "citation_ok": true
+    },
+    {
+      "query": "Find all file I/O operations.",
+      "status_code": 200,
+      "latency_ms": 234.64,
+      "top5_returned": 5,
+      "top5_relevant": 5,
+      "citation_ok": true
+    },
+    {
+      "query": "What are the dependencies of MODULE-X?",
+      "status_code": 200,
+      "latency_ms": 112.72,
+      "top5_returned": 5,
+      "top5_relevant": 4,
+      "citation_ok": true
+    }
+  ],
+  "ingest_last_stats": {
+    "files_scanned": 68,
+    "files_processed": 68,
+    "total_lines": 132166,
+    "total_chunks": 1788,
+    "total_tokens": 1361493,
+    "total_embeddings": 1788,
+    "languages": {
+      "c": 1673,
+      "config": 72,
+      "cobol": 43
+    },
+    "duration_seconds": 18.64,
+    "errors": []
+  }
+}
