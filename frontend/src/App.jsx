@@ -318,14 +318,13 @@ function App() {
           </span>
           <span className="menu-bar-sep" aria-hidden="true">|</span>
           <nav className="menu-bar-toolbar" aria-label="Main menu">
-            <span className="menu-bar-item menu-bar-app">LegacyLens</span>
-            <button type="button" className="menu-bar-item">File</button>
-            <button type="button" className="menu-bar-item">Edit</button>
-            <button type="button" className="menu-bar-item">View</button>
-            <button type="button" className="menu-bar-item">Go</button>
-            <button type="button" className="menu-bar-item" onClick={restoreTerminal}>Terminal</button>
-            <button type="button" className="menu-bar-item">Window</button>
-            <button type="button" className="menu-bar-item">Help</button>
+            <span className="menu-bar-item menu-bar-app" onClick={() => setShowDonutWindow(true)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowDonutWindow(true); } }}>LegacyLens</span>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>File</button>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>Edit</button>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>View</button>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>Go</button>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>Window</button>
+            <button type="button" className="menu-bar-item" onClick={() => setShowDonutWindow(true)}>Help</button>
           </nav>
         </div>
         <div className="menu-bar-right">

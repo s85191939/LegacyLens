@@ -75,7 +75,17 @@ async def query_codebase(request: Request, body: QueryRequest):
 
     if not retrieval_result.sources:
         total_ms = (time.time() - start_time) * 1000
-        no_results_answer = "No relevant code found. Try rephrasing your query or broadening the search."
+        # If collection is empty, tell user to run REINDEX
+        store = request.app.state.store
+        try:
+            info = await store.get_collection_info()
+            points = info.get("points_count") or info.get("vectors_count") or 0
+            if points == 0:
+                no_results_answer = "No code indexed yet. Click REINDEX to ingest the codebase, then try your query again."
+            else:
+                no_results_answer = "No relevant code found. Try rephrasing your query or broadening the search."
+        except Exception:
+            no_results_answer = "No relevant code found. Try rephrasing your query or broadening the search."
 
         if body.stream:
             # Must return NDJSON format when stream was requested

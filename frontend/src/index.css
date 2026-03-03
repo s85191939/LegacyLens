@@ -115,7 +115,7 @@ body {
 }
 
 .menu-bar-app {
-  cursor: default;
+  cursor: pointer;
   font-weight: 600;
 }
 
