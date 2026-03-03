@@ -103,26 +103,31 @@ Or open http://localhost:3000 in your browser and use the web interface.
 
 ## Local Development
 
+Run all commands from the **project root** (`LegacyLens/`), not from `backend/` or `frontend/`.
+
 ### Backend
 
 ```bash
-cd backend
-pip install -r requirements.txt
+# From project root (LegacyLens/)
+pip install -r backend/requirements.txt
 
-# Start Qdrant
+# In another terminal: start Qdrant
 docker run -p 6333:6333 qdrant/qdrant:latest
 
-# Run backend
+# Run backend (must be from project root so "backend" package is found)
 uvicorn backend.main:app --reload --port 8000
 ```
 
 ### Frontend
 
 ```bash
+# From project root
 cd frontend
 npm install
 npm run dev
 ```
+
+Frontend dev server runs at http://localhost:3000 and proxies `/api` to the backend at http://localhost:8000.
 
 ## API Endpoints
 

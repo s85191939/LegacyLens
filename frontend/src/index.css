@@ -3,26 +3,41 @@
 @tailwind utilities;
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'VT323', 'Share Tech Mono', monospace;
+  background-color: #0a0e0a;
+  color: #33ff33;
 }
 
-/* Custom scrollbar */
+/* CRT / terminal scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #0a0e0a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #4a4a6a;
-  border-radius: 4px;
+  background: #2d4a2d;
+  border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6a6a8a;
+  background: #33ff33;
 }
 
 /* Code block styling */
 pre {
-  font-size: 13px !important;
-  line-height: 1.5 !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* Subtle CRT scanline overlay (optional) */
+.crt-overlay {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
 }

@@ -25,7 +25,6 @@ function App() {
   const [timings, setTimings] = useState(null)
   const [health, setHealth] = useState(null)
 
-  // Check health on mount
   useEffect(() => {
     fetch(`${API_BASE}/health`)
       .then(res => res.json())
@@ -91,7 +90,6 @@ function App() {
       }
     } catch (err) {
       setError(err.message)
-      // Fall back to non-streaming
       try {
         const response = await fetch(`${API_BASE}/query`, {
           method: 'POST',
@@ -137,52 +135,44 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-lg font-bold">
-              L
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">LegacyLens</h1>
-              <p className="text-xs text-gray-400">RAG for Legacy Codebases</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-crt-bg text-crt-green font-terminal relative">
+      <div className="crt-overlay fixed inset-0 z-[100]" aria-hidden="true" />
+
+      <main className="max-w-4xl mx-auto px-4 py-8 relative z-10">
+        {/* Header - faux terminal title */}
+        <header className="mb-8">
+          <h1 className="text-3xl text-crt-green mb-1"># LegacyLens</h1>
+          <p className="text-crt-green/90 text-lg">
+            Would you like to play a game? — RAG-powered legacy codebase explorer.
+          </p>
+          <div className="flex items-center gap-4 mt-3 text-sm text-crt-green/70">
             {health && (
-              <span className={`text-xs px-2 py-1 rounded ${
-                health.status === 'healthy'
-                  ? 'bg-emerald-900/50 text-emerald-400'
-                  : 'bg-red-900/50 text-red-400'
-              }`}>
-                {health.status === 'healthy' ? 'Connected' : 'Disconnected'}
+              <span>
+                [{health.status === 'healthy' ? 'ONLINE' : 'DEGRADED'}]
               </span>
             )}
             <button
+              type="button"
               onClick={handleIngest}
               disabled={loading}
-              className="text-sm px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              className="hover:text-crt-green transition-colors disabled:opacity-50 underline"
             >
-              Re-ingest
+              re-ingest
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Feature Selector */}
-        <div className="flex gap-2 mb-4 flex-wrap">
+        {/* Feature toggles - terminal style */}
+        <div className="flex gap-2 mb-4 flex-wrap text-sm">
           {FEATURES.map(f => (
             <button
               key={f.id || 'general'}
+              type="button"
               onClick={() => setFeature(f.id)}
-              className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
+              className={`px-2 py-0.5 border transition-colors ${
                 feature === f.id
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  ? 'border-crt-green text-crt-green'
+                  : 'border-crt-border text-crt-green/70 hover:border-crt-green/50'
               }`}
             >
               {f.label}
@@ -190,76 +180,67 @@ function App() {
           ))}
         </div>
 
-        {/* Query Input */}
-        <QueryInput
-          onSubmit={handleQuery}
-          loading={loading}
-          query={query}
-          setQuery={setQuery}
-        />
+        {/* Command line input */}
+        <div className="mb-6">
+          <QueryInput
+            onSubmit={handleQuery}
+            loading={loading}
+            query={query}
+            setQuery={setQuery}
+          />
+        </div>
 
-        {/* Error */}
         {error && (
-          <div className="mt-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-300">
-            {error}
+          <div className="mb-4 text-red-400 border border-red-800/50 px-3 py-2 text-sm">
+            ERROR: {error}
           </div>
         )}
 
-        {/* Timings */}
         {timings && (
-          <div className="mt-3 flex gap-4 text-xs text-gray-500">
-            {timings.retrieval_ms && (
-              <span>Retrieval: {timings.retrieval_ms}ms</span>
+          <div className="mb-4 flex gap-4 text-sm text-crt-green/60">
+            {timings.retrieval_ms != null && (
+              <span>retrieval: {timings.retrieval_ms}ms</span>
             )}
-            {timings.total_ms && (
-              <span>Total: {timings.total_ms}ms</span>
+            {timings.total_ms != null && (
+              <span>total: {timings.total_ms}ms</span>
             )}
             {sources.length > 0 && (
-              <span>{sources.length} sources found</span>
+              <span>{sources.length} source(s)</span>
             )}
           </div>
         )}
 
-        {/* Results Grid */}
         {(answer || sources.length > 0) && (
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Answer Panel */}
-            <div className="lg:col-span-1">
+          <div className="mt-6 space-y-6">
+            {answer && (
               <AnswerPanel answer={answer} loading={loading} />
-            </div>
-
-            {/* Sources Panel */}
-            <div className="lg:col-span-1">
+            )}
+            {sources.length > 0 && (
               <ResultsPanel sources={sources} />
-            </div>
+            )}
           </div>
         )}
 
-        {/* Empty State */}
         {!answer && sources.length === 0 && !loading && !error && (
-          <div className="mt-16 text-center">
-            <div className="text-6xl mb-4">🔍</div>
-            <h2 className="text-xl font-semibold text-gray-300 mb-2">
-              Query the GnuCOBOL Codebase
-            </h2>
-            <p className="text-gray-500 max-w-md mx-auto mb-8">
-              Ask questions about the codebase in natural language. Get code snippets,
-              explanations, and references.
+          <div className="mt-12 space-y-6">
+            <p className="text-crt-green/80 text-lg">
+              Query the GnuCOBOL codebase. Examples:
             </p>
-            <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
+            <div className="flex flex-wrap gap-2">
               {[
-                "Where is the main entry point of the compiler?",
-                "How does COBOL file I/O work?",
-                "What error handling patterns are used?",
-                "Show me the parser implementation",
+                'Where is the main entry point of the compiler?',
+                'How does COBOL file I/O work?',
+                'What error handling patterns are used?',
+                'Show me the parser implementation',
               ].map((example) => (
                 <button
                   key={example}
+                  type="button"
                   onClick={() => {
                     setQuery(example)
                     handleQuery(example)
                   }}
-                  className="text-sm px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300"
+                  className="text-left text-sm px-3 py-2 border border-crt-border text-crt-green/90 hover:border-crt-green hover:text-crt-green transition-colors max-w-md"
                 >
                   {example}
                 </button>
