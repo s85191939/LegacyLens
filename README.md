@@ -88,6 +88,8 @@ LegacyLens makes the **GnuCOBOL** compiler codebase (~128K LOC, 432 files) query
 4. Without Qdrant the app runs in **degraded** mode (UI and health work; ingest/query need Qdrant). Add a Qdrant Cloud instance and set the variables above to enable full RAG.
 5. Health check: Railway uses `/api/health` (or `/health`). The app binds to `PORT` and starts within a few seconds; Qdrant connection is tried with a short timeout so the deploy does not hang.
 
+**If you see "Application failed to respond":** Open the service **Deploy logs** in Railway. Confirm the log line `Starting on 0.0.0.0:<port>` appears and that no Python traceback follows. Set `OPENAI_API_KEY` in Variables (required). The app responds with HTTP 200 even when Qdrant is unavailable (degraded mode).
+
 ## Quick Start
 
 **Prerequisites:** Docker & Docker Compose, OpenAI API key.

@@ -1,8 +1,9 @@
 """Application configuration using Pydantic Settings."""
 
-import os
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -15,6 +16,14 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""  # Required for Qdrant Cloud
     qdrant_collection: str = "legacylens"
+
+    @field_validator("openai_api_key", "qdrant_api_key", mode="before")
+    @classmethod
+    def strip_api_keys(cls, v):
+        """Strip whitespace/newlines so pasted keys (e.g. in Railway) work."""
+        if v is None:
+            return ""
+        return v.strip() if isinstance(v, str) else v
 
     # Embedding
     embedding_model: str = "text-embedding-3-small"

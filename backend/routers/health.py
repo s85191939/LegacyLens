@@ -1,18 +1,26 @@
 """Health check and stats endpoints."""
 
+import asyncio
+
 from fastapi import APIRouter, Request
 
 router = APIRouter(tags=["health"])
+
+# Short timeout so Railway health check never hangs when Qdrant is unreachable
+HEALTH_CHECK_TIMEOUT = 3.0
 
 
 @router.get("/api/health")
 @router.get("/health")  # alias for Railway / load balancers that check /health
 async def health_check(request: Request):
-    """Health check endpoint - also attempts to reconnect if Qdrant was down."""
+    """Health check endpoint. Returns 200 quickly; Qdrant check is time-limited."""
     store = request.app.state.store
 
     try:
-        info = await store.get_collection_info()
+        info = await asyncio.wait_for(
+            store.get_collection_info(),
+            timeout=HEALTH_CHECK_TIMEOUT,
+        )
 
         if info.get("error"):
             request.app.state.qdrant_connected = False
@@ -22,7 +30,6 @@ async def health_check(request: Request):
                 "collection": info,
             }
 
-        # We have valid collection info, mark healthy.
         request.app.state.qdrant_connected = True
         return {
             "status": "healthy",
@@ -30,6 +37,13 @@ async def health_check(request: Request):
             "collection": info,
         }
 
+    except asyncio.TimeoutError:
+        request.app.state.qdrant_connected = False
+        return {
+            "status": "degraded",
+            "qdrant": "disconnected: timeout",
+            "collection": {"error": "timeout"},
+        }
     except Exception as exc:
         request.app.state.qdrant_connected = False
         return {
