@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <linearGradient id="rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff3366"/>
+      <stop offset="16%" style="stop-color:#ff6633"/>
+      <stop offset="33%" style="stop-color:#ffcc33"/>
+      <stop offset="50%" style="stop-color:#33cc66"/>
+      <stop offset="66%" style="stop-color:#3366ff"/>
+      <stop offset="83%" style="stop-color:#9933ff"/>
+      <stop offset="100%" style="stop-color:#ff3366"/>
+    </linearGradient>
+    <linearGradient id="banana-fill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff9c4;stop-opacity:0.95"/>
+      <stop offset="50%" style="stop-color:#fff59d;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#ffeb3b;stop-opacity:0.85"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Dark base -->
+  <rect width="100%" height="100%" fill="#020703"/>
+  <!-- Rainbow gradient overlay (subtle wallpaper) -->
+  <rect width="100%" height="100%" fill="url(#rainbow)" opacity="0.12"/>
+  <!-- Banana shape (stylized, centered) -->
+  <g transform="translate(600, 400)" filter="url(#glow)">
+    <path d="M -80 -120 Q 120 -140 180 0 Q 140 120 60 140 Q -40 100 -100 20 Q -140 -60 -80 -120 Z" 
+          fill="url(#banana-fill)" stroke="#e6c200" stroke-width="4" opacity="0.85"/>
+    <path d="M -60 -90 Q 80 -100 120 10 Q 90 80 30 95 Q -20 70 -70 15 Q -95 -40 -60 -90 Z" 
+          fill="#020703" opacity="0.25"/>
+  </g>
+</svg>

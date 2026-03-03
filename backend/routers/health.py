@@ -6,6 +6,7 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/api/health")
+@router.get("/health")  # alias for Railway / load balancers that check /health
 async def health_check(request: Request):
     """Health check endpoint - also attempts to reconnect if Qdrant was down."""
     store = request.app.state.store

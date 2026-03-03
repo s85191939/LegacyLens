@@ -1,5 +1,6 @@
 """FastAPI application entry point for LegacyLens."""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -36,15 +37,16 @@ async def lifespan(app: FastAPI):
     embedder = Embedder()
     store = QdrantStore()
 
-    # Try to connect to Qdrant, but don't crash if unavailable
+    # Try to connect to Qdrant with a short timeout (Railway health check must pass quickly)
     app.state.qdrant_connected = False
     try:
-        await store.initialize()
+        await asyncio.wait_for(store.initialize(), timeout=5.0)
         app.state.qdrant_connected = True
         logger.info("Qdrant connected successfully")
+    except asyncio.TimeoutError:
+        logger.warning("Qdrant connection timed out on startup — degraded mode")
     except Exception as e:
-        logger.warning(f"Qdrant not available on startup: {e}")
-        logger.warning("App will start in degraded mode — query/ingest won't work until Qdrant is reachable")
+        logger.warning("Qdrant not available on startup: %s — degraded mode", e)
 
     retriever = Retriever(embedder=embedder, store=store)
     generator = Generator()
