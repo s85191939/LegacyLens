@@ -1,9 +1,9 @@
 import React from 'react'
 
-function QueryInput({ onSubmit, loading, query, setQuery }) {
+function QueryInput({ onSubmit, loading, query, setQuery, disabled }) {
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (query.trim() && !loading) {
+    if (query.trim() && !loading && !disabled) {
       onSubmit(query.trim())
     }
   }
@@ -14,6 +14,8 @@ function QueryInput({ onSubmit, loading, query, setQuery }) {
       handleSubmit(e)
     }
   }
+
+  const isDisabled = loading || disabled
 
   return (
     <form onSubmit={handleSubmit} className="prompt-row">
@@ -29,11 +31,11 @@ function QueryInput({ onSubmit, loading, query, setQuery }) {
           onKeyDown={handleKeyDown}
           placeholder="e.g. show parser implementation"
           className="prompt-input"
-          disabled={loading}
+          disabled={isDisabled}
         />
         <span className="cursor-block" aria-hidden="true" />
       </div>
-      <button type="submit" className="query-submit" disabled={loading || !query.trim()}>
+      <button type="submit" className="query-submit" disabled={isDisabled || !query.trim()}>
         {loading ? 'RUNNING' : 'RUN'}
       </button>
     </form>

@@ -135,9 +135,30 @@ function App() {
   const [openDropdown, setOpenDropdown] = useState(null) // 'general' | 'explain' | ... | null
   const [windowPosition, setWindowPosition] = useState({ x: 96, y: 52 })
   const [indexEmpty, setIndexEmpty] = useState(false)
+  const [ingesting, setIngesting] = useState(false)
+  const [ingestStartTime, setIngestStartTime] = useState(null)
+  const [ingestElapsed, setIngestElapsed] = useState(0)
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
 
   const terminalRef = useRef(null)
   const dragRef = useRef(null)
+
+  // Beach-ball cursor: track mouse when ingesting
+  useEffect(() => {
+    if (!ingesting) return
+    const onMove = (e) => setCursorPos({ x: e.clientX, y: e.clientY })
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [ingesting])
+
+  // Timer tick while ingesting
+  useEffect(() => {
+    if (!ingesting || ingestStartTime == null) return
+    const tick = () => setIngestElapsed(Math.floor((Date.now() - ingestStartTime) / 1000))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [ingesting, ingestStartTime])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -244,6 +265,9 @@ function App() {
 
   const handleIngest = async () => {
     setLoading(true)
+    setIngesting(true)
+    setIngestStartTime(Date.now())
+    setIngestElapsed(0)
     setError(null)
     try {
       const response = await fetch(`${API_BASE}/ingest`, {
@@ -261,6 +285,8 @@ function App() {
       setError(err.message)
     } finally {
       setLoading(false)
+      setIngesting(false)
+      setIngestStartTime(null)
     }
   }
 
@@ -297,7 +323,7 @@ function App() {
   }
 
   return (
-    <div className="desktop-shell">
+    <div className={`desktop-shell ${ingesting ? 'ingesting-cursor' : ''}`}>
       {/* Toolbar: banana logo (image joke) + app menu + time */}
       <header className="menu-bar banana-toolbar" aria-label="App toolbar">
         <div className="menu-bar-left">
@@ -337,6 +363,15 @@ function App() {
           </time>
         </div>
       </header>
+
+      {/* Spinning beach ball cursor when reindexing */}
+      {ingesting && (
+        <div
+          className="cursor-beach-ball"
+          style={{ left: cursorPos.x, top: cursorPos.y }}
+          aria-hidden
+        />
+      )}
 
       <div className="desktop-icons-stack" aria-hidden="true">
         <button className="desktop-icon" onClick={() => setShowDonutWindow(true)}>
@@ -392,7 +427,18 @@ function App() {
                 {sources.length ? ` | SOURCES ${sources.length}` : ''}
               </p>
 
-              <div className="feature-row">
+              {ingesting && (
+                <div className="ingest-overlay">
+                  <div className="spinning-ball" aria-hidden="true" />
+                  <p className="ingest-overlay-text">Indexing codebase…</p>
+                  <p className="ingest-overlay-timer">
+                    {Math.floor(ingestElapsed / 60)}:{String(ingestElapsed % 60).padStart(2, '0')}
+                  </p>
+                  <p className="ingest-overlay-hint">Queries disabled until indexing finishes.</p>
+                </div>
+              )}
+
+              <div className={`feature-row ${ingesting ? 'disabled' : ''}`} aria-disabled={ingesting}>
                 <span className="feature-row-label">Query mode:</span>
                 {FEATURES_WITH_PROMPTS.map((f) => {
                   const key = f.id ?? 'general'
@@ -425,6 +471,7 @@ function App() {
                                 role="option"
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  if (ingesting) return
                                   setFeature(f.id)
                                   setQuery(p)
                                   handleQuery(p)
@@ -442,7 +489,7 @@ function App() {
                 })}
               </div>
 
-              <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} />
+              <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} disabled={ingesting} />
 
               {error && <div className="error-box">[ERROR] {error}</div>}
 
