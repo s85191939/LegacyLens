@@ -578,3 +578,75 @@ button.dot {
     font-size: 28px;
   }
 }
+
+.desktop-icons-stack {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 4;
+}
+
+.desktop-icon {
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.terminal-icon-box {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, #f8fbff, #cfddec);
+  color: #2f5578;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.window-dots .dot {
+  cursor: pointer;
+}
+
+.window-dots .dot:focus {
+  outline: 2px solid #4d8cc9;
+  outline-offset: 1px;
+}
+
+.terminal-window.maximized {
+  max-width: 100%;
+  width: calc(100vw - 24px);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 58, 88, 0.25);
+  display: grid;
+  place-items: center;
+  z-index: 9;
+}
+
+.donut-window {
+  width: min(420px, calc(100% - 24px));
+  background: #f7fbff;
+  border: 1px solid #9fb6cd;
+  border-radius: 10px;
+  box-shadow: 0 20px 40px rgba(31, 58, 90, 0.35);
+  padding: 16px;
+  color: #2d506f;
+}
+
+.donut-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
