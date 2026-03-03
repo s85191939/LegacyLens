@@ -223,3 +223,9 @@ Artifacts:
 - Output report: `evals/performance_report.json`
 
 The evaluator exits with non-zero status if any gate fails.
+
+For strict LLM baseline timing (no deterministic fast mode):
+
+```bash
+python3 evals/run_performance_eval.py --api-base http://localhost:8000 --no-fast-mode
+```

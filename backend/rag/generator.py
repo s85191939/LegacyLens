@@ -9,18 +9,13 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a legacy code analyst specializing in COBOL and C codebases. You help developers understand, navigate, and maintain large legacy enterprise systems.
+SYSTEM_PROMPT = """You are a legacy code analyst for COBOL and C systems.
 
-When answering questions about code:
-1. Always reference specific files and line numbers using the format: File: <path> | Lines: <start>-<end>
-2. Explain code in plain English, avoiding jargon when possible
-3. Highlight important patterns, dependencies, and business logic
-4. Note any potential issues or areas of concern
-5. When showing code structure, explain the COBOL divisions/sections/paragraphs or C functions
-
-You have access to retrieved code snippets from the GnuCOBOL compiler codebase. Use these snippets to provide accurate, well-cited answers.
-
-If the retrieved context doesn't contain enough information to fully answer the question, say so clearly and suggest what additional searches might help."""
+Rules:
+1. Cite files and lines as: File: <path> | Lines: <start>-<end>
+2. Keep answers concise and precise
+3. Base claims only on retrieved snippets
+4. If context is insufficient, say so clearly"""
 
 
 FEATURE_PROMPTS = {
@@ -64,6 +59,9 @@ class Generator:
     def __init__(self):
         settings = get_settings()
         self.model = settings.llm_model
+        self.fast_model = settings.llm_model_fast
+        self.max_tokens = settings.llm_max_tokens
+        self.fast_max_tokens = settings.llm_fast_max_tokens
 
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -100,10 +98,13 @@ class Generator:
         sources: List[Dict[str, Any]],
         feature: Optional[str] = None,
         stream: bool = False,
+        fast_mode: bool = False,
     ) -> Union[str, AsyncGenerator[str, None]]:
         feature_instruction = ""
         if feature and feature in FEATURE_PROMPTS:
             feature_instruction = f"\n\nAdditional instruction: {FEATURE_PROMPTS[feature]}"
+
+        answer_style = "Give a concise answer in 5-10 bullet points." if fast_mode else "Provide a comprehensive answer."
 
         user_message = f"""Question: {query}{feature_instruction}
 
@@ -113,7 +114,15 @@ Retrieved Code Context:
 Source files referenced:
 {self._format_source_list(sources)}
 
-Please provide a comprehensive answer with specific file and line references."""
+{answer_style} Always include specific file and line references."""
+
+        if fast_mode:
+            fast_answer = self._fast_extractive_answer(query=query, sources=sources)
+            if stream:
+                async def quick_stream():
+                    yield fast_answer
+                return quick_stream()
+            return fast_answer
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -121,17 +130,19 @@ Please provide a comprehensive answer with specific file and line references."""
         ]
 
         if stream:
-            return self._stream_response(messages)
-        return await self._complete_response(messages)
+            return self._stream_response(messages, fast_mode=fast_mode)
+        return await self._complete_response(messages, fast_mode=fast_mode)
 
-    async def _complete_response(self, messages: list) -> str:
+    async def _complete_response(self, messages: list, fast_mode: bool = False) -> str:
         """Generate complete response with OpenRouter fallback."""
+        model = self.fast_model if fast_mode else self.model
+        max_tokens = self.fast_max_tokens if fast_mode else self.max_tokens
         try:
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=model,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=2000,
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content
         except Exception as exc:
@@ -141,19 +152,21 @@ Please provide a comprehensive answer with specific file and line references."""
                     model=self.openrouter_model,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=2000,
+                    max_tokens=max_tokens,
                 )
                 return response.choices[0].message.content
             raise
 
-    async def _stream_response(self, messages: list) -> AsyncGenerator[str, None]:
+    async def _stream_response(self, messages: list, fast_mode: bool = False) -> AsyncGenerator[str, None]:
         """Generate streaming response with OpenRouter fallback."""
+        model = self.fast_model if fast_mode else self.model
+        max_tokens = self.fast_max_tokens if fast_mode else self.max_tokens
         try:
             stream = await self.client.chat.completions.create(
-                model=self.model,
+                model=model,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=2000,
+                max_tokens=max_tokens,
                 stream=True,
             )
             async for chunk in stream:
@@ -169,12 +182,36 @@ Please provide a comprehensive answer with specific file and line references."""
                 model=self.openrouter_model,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=2000,
+                max_tokens=max_tokens,
                 stream=True,
             )
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+
+    def _fast_extractive_answer(self, query: str, sources: List[Dict[str, Any]]) -> str:
+        """Low-latency extractive answer for performance mode."""
+        if not sources:
+            return "No relevant code found for this query."
+
+        lines = [
+            f"Fast summary for: {query}",
+            "",
+            "Most relevant locations:",
+        ]
+
+        for idx, src in enumerate(sources[:3], 1):
+            content = (src.get("content") or "").strip().replace("\n", " ")
+            snippet = content[:180] + ("..." if len(content) > 180 else "")
+            lines.append(
+                f"{idx}. File: {src.get('file_path')} | Lines: {src.get('start_line')}-{src.get('end_line')}"
+            )
+            if snippet:
+                lines.append(f"   Snippet: {snippet}")
+
+        lines.append("")
+        lines.append("Use full mode (stream=true or fast_mode=false) for deeper explanation.")
+        return "\n".join(lines)
 
     def _format_source_list(self, sources: List[Dict[str, Any]]) -> str:
         lines = []

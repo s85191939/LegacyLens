@@ -18,6 +18,7 @@ class QueryRequest(BaseModel):
     file_path: Optional[str] = None
     feature: Optional[str] = None  # "explain", "dependencies", "patterns", "documentation", "business_logic"
     stream: bool = False
+    fast_mode: Optional[bool] = None
 
 
 class SourceInfo(BaseModel):
@@ -60,6 +61,9 @@ async def query_codebase(request: Request, body: QueryRequest):
 
     retriever = request.app.state.retriever
     generator = request.app.state.generator
+
+    # Fast mode defaults to true for non-streaming API calls
+    fast_mode = body.fast_mode if body.fast_mode is not None else (not body.stream)
 
     # 1. Retrieve relevant chunks
     retrieval_result = await retriever.retrieve(
@@ -145,6 +149,7 @@ async def query_codebase(request: Request, body: QueryRequest):
             sources=retrieval_result.sources,
             feature=body.feature,
             stream=False,
+            fast_mode=fast_mode,
         )
 
         total_ms = (time.time() - start_time) * 1000

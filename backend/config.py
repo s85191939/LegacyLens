@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # LLM
     llm_model: str = "gpt-4o"
 
+    # LLM performance controls
+    llm_model_fast: str = "gpt-4o-mini"
+    llm_max_tokens: int = 1200
+    llm_fast_max_tokens: int = 220
+
     # OpenRouter fallback
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "openai/gpt-4o-mini"

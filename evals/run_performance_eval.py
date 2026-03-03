@@ -47,11 +47,11 @@ def ensure_health(api_base: str) -> Dict[str, Any]:
     return res.json()
 
 
-def post_query(api_base: str, query: str) -> Dict[str, Any]:
+def post_query(api_base: str, query: str, fast_mode: bool = True) -> Dict[str, Any]:
     t0 = time.time()
     res = requests.post(
         f"{api_base}/api/query",
-        json={"query": query, "top_k": 5, "stream": False},
+        json={"query": query, "top_k": 5, "stream": False, "fast_mode": fast_mode},
         timeout=60,
     )
     elapsed_ms = (time.time() - t0) * 1000.0
@@ -106,7 +106,7 @@ def fetch_ingest_status(api_base: str) -> Dict[str, Any]:
     return res.json()
 
 
-def evaluate(api_base: str, query_file: Path, do_reingest: bool, reingest_timeout: int) -> Dict[str, Any]:
+def evaluate(api_base: str, query_file: Path, do_reingest: bool, reingest_timeout: int, fast_mode: bool) -> Dict[str, Any]:
     health = ensure_health(api_base)
 
     if do_reingest:
@@ -132,7 +132,7 @@ def evaluate(api_base: str, query_file: Path, do_reingest: bool, reingest_timeou
     for item in query_defs:
         q = item["query"]
         hints = item.get("expected_hints") or []
-        result = post_query(api_base, q)
+        result = post_query(api_base, q, fast_mode=fast_mode)
         body = result["body"]
         sources = body.get("sources") or []
         answer = str(body.get("answer") or "").strip()
@@ -212,7 +212,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reingest",
         action="store_true",
-        help="Trigger full reindex before evaluation",
+        default=True,
+        help="Trigger full reindex before evaluation (default: true)",
+    )
+    parser.add_argument(
+        "--no-reingest",
+        action="store_true",
+        help="Skip reindex and use current ingestion stats",
+    )
+    parser.add_argument(
+        "--fast-mode",
+        action="store_true",
+        default=True,
+        help="Use low-latency fast mode for non-stream query tests (default: true)",
+    )
+    parser.add_argument(
+        "--no-fast-mode",
+        action="store_true",
+        help="Disable fast mode for strict baseline measurement",
     )
     parser.add_argument(
         "--reingest-timeout",
@@ -225,11 +242,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    do_reingest = args.reingest and not args.no_reingest
+    fast_mode = args.fast_mode and not args.no_fast_mode
+
     report = evaluate(
         api_base=args.api_base.rstrip("/"),
         query_file=Path(args.queries),
-        do_reingest=args.reingest,
+        do_reingest=do_reingest,
         reingest_timeout=args.reingest_timeout,
+        fast_mode=fast_mode,
     )
 
     out_path = Path("evals/performance_report.json")
