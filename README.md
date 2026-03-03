@@ -1,6 +1,7 @@
 # LegacyLens
 
 > RAG-powered system for navigating large legacy enterprise codebases through natural language.
+https://legacylens-production-9547.up.railway.app/
 
 ## MVP Status (Based on Week 3 + Pre-Search Docs)
 
