@@ -143,13 +143,13 @@ function App() {
   const terminalRef = useRef(null)
   const dragRef = useRef(null)
 
-  // Beach-ball cursor: track mouse when ingesting
+  // Beach-ball cursor: track mouse when ingesting or query loading
   useEffect(() => {
-    if (!ingesting) return
+    if (!ingesting && !loading) return
     const onMove = (e) => setCursorPos({ x: e.clientX, y: e.clientY })
     window.addEventListener('mousemove', onMove)
     return () => window.removeEventListener('mousemove', onMove)
-  }, [ingesting])
+  }, [ingesting, loading])
 
   // Timer tick while ingesting
   useEffect(() => {
@@ -245,6 +245,7 @@ function App() {
               setAnswer(answerText)
             } else if (data.type === 'done') {
               setTimings((prev) => ({ ...prev, total_ms: Math.round(data.total_time_ms || 0) }))
+              setError(null)
             }
           } catch (_) {
             // Ignore malformed partial line chunks
@@ -270,6 +271,7 @@ function App() {
           retrieval_ms: Math.round(data.retrieval_time_ms || 0),
           total_ms: Math.round(data.total_time_ms || 0),
         })
+        setError(null)
       } catch (fallbackErr) {
         setError(fallbackErr.message)
       }
@@ -341,8 +343,9 @@ function App() {
     window.addEventListener('mouseup', endWindowDrag)
   }
 
+  const showLoadingCursor = ingesting || loading
   return (
-    <div className={`desktop-shell ${ingesting ? 'ingesting-cursor' : ''}`}>
+    <div className={`desktop-shell ${showLoadingCursor ? 'ingesting-cursor' : ''}`}>
       {/* Toolbar: banana logo (image joke) + app menu + time */}
       <header className="menu-bar banana-toolbar" aria-label="App toolbar">
         <div className="menu-bar-left">
@@ -383,8 +386,8 @@ function App() {
         </div>
       </header>
 
-      {/* Spinning beach ball cursor when reindexing */}
-      {ingesting && (
+      {/* Spinning beach ball cursor when reindexing or query loading */}
+      {showLoadingCursor && (
         <div
           className="cursor-beach-ball"
           style={{ left: cursorPos.x, top: cursorPos.y }}
@@ -507,7 +510,7 @@ function App() {
 
               <QueryInput onSubmit={handleQuery} loading={loading} query={query} setQuery={setQuery} disabled={!searchable} />
 
-              {error && <div className="error-box">[ERROR] {error}</div>}
+              {error && !searchable && <div className="error-box">[ERROR] {error}</div>}
 
               {!loading && sources.length === 0 && (answer || indexEmpty) && (answer?.includes('No code indexed') || answer?.includes('Something went wrong') || indexEmpty) && (
                 <div className="reindex-cta">
