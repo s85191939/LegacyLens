@@ -53,13 +53,13 @@ docker-compose up --build
 
 ### Step 5: Verify Services Are Running
 
-| Service | URL | Expected |
-|---------|-----|----------|
-| Frontend | http://localhost:3000 | Web UI loads |
-| Backend API | http://localhost:8000 | JSON root response |
+Everything is on port **8000**:
+
+| What | URL | Expected |
+|------|-----|----------|
+| UI | http://localhost:8000 | Web UI loads |
+| Health | http://localhost:8000/api/health | `{"status": "healthy"}` |
 | API Docs | http://localhost:8000/docs | Swagger UI |
-| Health Check | http://localhost:8000/api/health | `{"status": "healthy"}` |
-| Qdrant Dashboard | http://localhost:6333/dashboard | Qdrant UI |
 
 ### Step 6: Ingest the Codebase
 
@@ -103,7 +103,7 @@ curl -X POST http://localhost:8000/api/query \
 
 **Via Web UI:**
 
-Open http://localhost:3000 and type your question.
+Open http://localhost:8000 and type your question.
 
 ---
 

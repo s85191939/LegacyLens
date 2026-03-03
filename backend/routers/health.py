@@ -9,30 +9,33 @@ router = APIRouter(tags=["health"])
 async def health_check(request: Request):
     """Health check endpoint - also attempts to reconnect if Qdrant was down."""
     store = request.app.state.store
-    qdrant_connected = getattr(request.app.state, "qdrant_connected", False)
 
     try:
         info = await store.get_collection_info()
-        qdrant_status = "connected"
 
-        # If we weren't connected before, try to initialize the collection
-        if not qdrant_connected:
-            try:
-                await store.initialize()
-            except Exception:
-                pass
-            request.app.state.qdrant_connected = True
+        if info.get("error"):
+            request.app.state.qdrant_connected = False
+            return {
+                "status": "degraded",
+                "qdrant": f"disconnected: {info['error']}",
+                "collection": info,
+            }
 
-    except Exception as e:
-        info = {}
-        qdrant_status = f"disconnected: {str(e)}"
+        # We have valid collection info, mark healthy.
+        request.app.state.qdrant_connected = True
+        return {
+            "status": "healthy",
+            "qdrant": "connected",
+            "collection": info,
+        }
+
+    except Exception as exc:
         request.app.state.qdrant_connected = False
-
-    return {
-        "status": "healthy" if request.app.state.qdrant_connected else "degraded",
-        "qdrant": qdrant_status,
-        "collection": info,
-    }
+        return {
+            "status": "degraded",
+            "qdrant": f"disconnected: {str(exc)}",
+            "collection": {"error": str(exc)},
+        }
 
 
 @router.get("/api/stats")
@@ -41,8 +44,9 @@ async def get_stats(request: Request):
     store = request.app.state.store
     try:
         info = await store.get_collection_info()
-    except Exception as e:
-        info = {"error": str(e)}
+    except Exception as exc:
+        info = {"error": str(exc)}
+
     return {
         "collection": info,
     }

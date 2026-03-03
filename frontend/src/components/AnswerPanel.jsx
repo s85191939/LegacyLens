@@ -2,68 +2,40 @@ import React from 'react'
 import ReactMarkdown from 'react-markdown'
 
 function AnswerPanel({ answer, loading }) {
-  if (!answer && !loading) return null
-
   return (
-    <div className="border border-crt-border bg-crt-bg/80">
-      <div className="px-3 py-2 border-b border-crt-border text-crt-green/80 text-sm">
-        &gt; ANSWER {loading && <span className="animate-pulse">[...]</span>}
-      </div>
-      <div className="p-4 overflow-auto max-h-[500px] font-terminal text-crt-green text-lg leading-relaxed">
-        <ReactMarkdown
-          components={{
-            code({ node, inline, className, children, ...props }) {
-              if (inline) {
-                return (
-                  <code className="text-crt-green/90 border border-crt-border px-1" {...props}>
+    <section className="terminal-panel">
+      <div className="panel-head">[ANSWER]</div>
+      <div className="panel-body">
+        {loading && !answer && <p className="dim">Thinking...</p>}
+        {!loading && !answer && <p className="dim">No answer yet. Run a query.</p>}
+        {answer && (
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className="md-p">{children}</p>,
+              strong: ({ children }) => <strong className="md-strong">{children}</strong>,
+              code: ({ inline, children, ...props }) =>
+                inline ? (
+                  <code className="md-inline" {...props}>
                     {children}
                   </code>
-                )
-              }
-              return (
-                <pre className="border border-crt-border p-3 my-2 overflow-x-auto text-base">
-                  <code className="text-crt-green/90" {...props}>
-                    {children}
-                  </code>
-                </pre>
-              )
-            },
-            p({ children }) {
-              return <p className="mb-3">{children}</p>
-            },
-            h1({ children }) {
-              return <h1 className="text-xl mb-2 text-crt-green">{children}</h1>
-            },
-            h2({ children }) {
-              return <h2 className="text-lg mb-2 text-crt-green">{children}</h2>
-            },
-            h3({ children }) {
-              return <h3 className="text-base mb-1 text-crt-green">{children}</h3>
-            },
-            ul({ children }) {
-              return <ul className="list-disc list-inside mb-3">{children}</ul>
-            },
-            ol({ children }) {
-              return <ol className="list-decimal list-inside mb-3">{children}</ol>
-            },
-            li({ children }) {
-              return <li className="mb-0.5">{children}</li>
-            },
-            strong({ children }) {
-              return <strong className="text-crt-green">{children}</strong>
-            },
-          }}
-        >
-          {answer}
-        </ReactMarkdown>
-        {loading && !answer && (
-          <div className="flex items-center gap-2 text-crt-green/70">
-            <span className="animate-pulse">_</span>
-            <span>Thinking...</span>
-          </div>
+                ) : (
+                  <pre className="md-pre">
+                    <code {...props}>{children}</code>
+                  </pre>
+                ),
+              ul: ({ children }) => <ul className="md-list">{children}</ul>,
+              ol: ({ children }) => <ol className="md-list-ordered">{children}</ol>,
+              li: ({ children }) => <li>{children}</li>,
+              h1: ({ children }) => <h1 className="md-h">{children}</h1>,
+              h2: ({ children }) => <h2 className="md-h">{children}</h2>,
+              h3: ({ children }) => <h3 className="md-h">{children}</h3>,
+            }}
+          >
+            {answer}
+          </ReactMarkdown>
         )}
       </div>
-    </div>
+    </section>
   )
 }
 

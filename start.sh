@@ -38,10 +38,9 @@ fi
 
 echo ""
 echo "Starting Docker Compose from: $SCRIPT_DIR"
-echo "  Frontend:  http://localhost:3000"
-echo "  Backend:   http://localhost:8000"
-echo "  API Docs:  http://localhost:8000/docs"
-echo "  Qdrant:    http://localhost:6333/dashboard"
+echo "  App (UI + API): http://localhost:8000"
+echo "  Health:         http://localhost:8000/api/health"
+echo "  API Docs:       http://localhost:8000/docs"
 echo ""
 
 docker-compose up --build

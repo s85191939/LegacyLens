@@ -69,11 +69,10 @@ cd /path/to/LegacyLens
 docker-compose up --build
 ```
 
-This starts three services:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs (Swagger)**: http://localhost:8000/docs
-- **Qdrant Dashboard**: http://localhost:6333/dashboard
+One app on port **8000**:
+- **UI**: http://localhost:8000
+- **API / health**: http://localhost:8000/api/health
+- **API Docs**: http://localhost:8000/docs
 
 ### 5. Ingest the Codebase
 
@@ -99,7 +98,7 @@ curl -X POST http://localhost:8000/api/query \
   -d '{"query": "Where is the main entry point of the compiler?"}'
 ```
 
-Or open http://localhost:3000 in your browser and use the web interface.
+Or open http://localhost:8000 in your browser and use the web interface.
 
 ## Local Development
 
